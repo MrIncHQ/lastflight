@@ -1,0 +1,11 @@
+# Not part of the published package
+info.md
+README.md
+
+# OS / editor clutter
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.claude/
+*.zip

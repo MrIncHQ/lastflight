@@ -1,0 +1,7 @@
+Put the item images in this folder with these exact names:
+
+  lastflight_ticket.png        (full ticket)
+  lastflight_ticket_stub.png   (ticket with the stub torn off)
+  flightlogbook.png            (admin Flight Logbook - opens the setup panel)
+
+Then copy them into ox_inventory/web/images/ (or your jaksam images folder).

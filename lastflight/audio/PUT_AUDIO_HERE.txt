@@ -1,0 +1,9 @@
+Put the flight audio in this folder with these exact names:
+
+  OneLastSunset.mp3      - starts at takeoff, plays while circling the island (5:59)
+  WelcometoLeonida.mp3   - starts when One Last Sunset ends, ends the journey (4:00)
+  seatbelt.mp3           - OPTIONAL chime with the seatbelt warning (Config.Audio.seatbelt.enabled = true)
+  pilot.mp3              - OPTIONAL captain announcement (set Config.Audio.pilot.enabled = true)
+
+If you swap a song, update its file name and duration (in seconds) in
+config.lua -> Config.Music.tracks so the flight stays timed to the music.

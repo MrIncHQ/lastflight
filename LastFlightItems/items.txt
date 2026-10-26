@@ -1,0 +1,49 @@
+-- === Last Flight to Vice City items ===
+-- Images: copy the two PNGs from "Inventory Images" (this folder) to
+--   ox_inventory:     ox_inventory/web/images/
+--   jaksam_inventory: your jaksam images folder
+--
+-- lastflight_ticket       = full boarding pass, given when the ticket is bought
+-- lastflight_ticket_stub  = torn-off stub, swapped in when the player boards (keepsake)
+-- lastflight_logbook      = admin tool, use it to open the flight setup panel
+--                           give it in game with:  /lastflight logbook [server id]
+
+-- ---------------------------------------------------------------
+-- ox_inventory  ->  paste into ox_inventory/data/items.lua
+-- ---------------------------------------------------------------
+	['lastflight_ticket'] = {
+		label = 'Boarding Pass',
+		weight = 0,
+		stack = false,
+		close = true,
+		description = 'Flight LS-VI-001 - Los Santos International to Vice City.',
+		client = { image = 'lastflight_ticket.png' }
+	},
+	['lastflight_ticket_stub'] = {
+		label = 'Boarding Pass Stub',
+		weight = 0,
+		stack = false,
+		close = true,
+		description = 'The torn stub from your last flight out of Los Santos.',
+		client = { image = 'lastflight_ticket_stub.png' }
+	},
+	-- ADMIN: use it to open the flight setup panel (server admins only)
+	['lastflight_logbook'] = {
+		label = 'Flight Logbook',
+		weight = 200,
+		stack = false,
+		close = true,
+		consume = 0,
+		description = 'Last Flight to Vice City - flight setup (admin only).',
+		client = { image = 'flightlogbook.png' },
+		server = { export = 'lastflight.useLogbook' }
+	},
+
+-- ---------------------------------------------------------------
+-- jaksam_inventory  ->  create two items in jaksam's item creator
+-- ---------------------------------------------------------------
+-- Name: lastflight_ticket        Label: Boarding Pass        Weight: 0   Stackable: no   Image: lastflight_ticket.png
+-- Name: lastflight_ticket_stub   Label: Boarding Pass Stub   Weight: 0   Stackable: no   Image: lastflight_ticket_stub.png
+-- Name: lastflight_logbook       Label: Flight Logbook       Weight: 200 Stackable: no   Image: flightlogbook.png
+--   (usable - the script registers it with registerUsableItem automatically, don't consume it)
+-- Then in lastflight/config.lua set:  Config.Inventory.provider = 'jaksam'
