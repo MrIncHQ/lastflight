@@ -121,6 +121,19 @@
     const preloaded = {};
 
     let playlist = null;
+    let musicUser = 1;            // this player's own music volume (scroll wheel), 0..1
+    let volTimer = null;
+
+    function setMusicVolume({ level = 1, show: pop = false }) {
+        musicUser = Math.max(0, Math.min(1, level));
+        if (playlist && tracks.music && !playlist.fading) tracks.music.volume = playlist.base * musicUser;
+        if (!pop) return;
+        $('vol-pct').textContent = `${Math.round(musicUser * 100)}%`;
+        $('vol-fill').style.width = `${musicUser * 100}%`;
+        show('vol');
+        clearTimeout(volTimer);
+        volTimer = setTimeout(() => hide('vol'), 1500);
+    }
 
     function stopTrack(kind) {
         if (kind === 'music' && playlist) { playlist.cancel = true; playlist = null; }
@@ -132,7 +145,7 @@
     // file is "played" silently for its duration so later songs stay in sync.
     function playPlaylist({ tracks: list = [], volume = 0.5, offset = 0 }) {
         stopTrack('music');
-        const pl = { cancel: false };
+        const pl = { cancel: false, base: Math.max(0, Math.min(1, volume)) };
         playlist = pl;
         let i = 0;
         let off = Math.max(0, offset);
@@ -142,7 +155,7 @@
             if (pl.cancel || idx >= list.length) return;
             const t = list[idx];
             const a = new Audio(t.file);
-            a.volume = Math.max(0, Math.min(1, volume));
+            a.volume = pl.base * musicUser;
             tracks.music = a;
             let moved = false;
             const next = () => { if (moved || pl.cancel) return; moved = true; start(idx + 1, 0); };
@@ -201,6 +214,7 @@
     function fadeTrack(kind, duration) {
         const a = tracks[kind];
         if (!a) return;
+        if (kind === 'music' && playlist) playlist.fading = true;   // the volume wheel stops fighting the fade
         const start = a.volume;
         const steps = Math.max(1, Math.floor(duration / 100));
         let i = 0;
@@ -302,7 +316,7 @@
     }
 
     function resetAll() {
-        ['desk', 'transport', 'ready', 'seatbelt', 'buckle', 'hud', 'landmark', 'farewell'].forEach(hide);
+        ['desk', 'transport', 'ready', 'seatbelt', 'buckle', 'hud', 'vol', 'landmark', 'farewell'].forEach(hide);
         clearInterval(etaTimer);
         clearInterval(readyTimer);
         Object.keys(tracks).forEach(stopTrack);
@@ -369,6 +383,7 @@
                 break;
             case 'audio': playTrack(data); break;
             case 'playlist': playPlaylist(data); break;
+            case 'musicVolume': setMusicVolume(data); break;
             case 'buckle': renderBuckle(data); break;
             case 'audioFade': fadeTrack(data.kind, data.duration || 1000); break;
             case 'fade': fade(data.to, data.duration || 1000); break;

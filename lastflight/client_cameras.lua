@@ -108,8 +108,8 @@ end
 ---------------------------------------------------------------------------
 -- Passenger-selectable views during the scenic flight
 ---------------------------------------------------------------------------
-Cams.modes = { 'gameplay', 'orbit', 'wing', 'chase', 'flyby' }
-Cams.modeLabels = { gameplay = 'Free look', orbit = 'Orbit', wing = 'Wing view', chase = 'Chase', flyby = 'Fly-by' }
+Cams.modes = { 'gameplay', 'freelook', 'orbit', 'wing', 'chase', 'flyby' }
+Cams.modeLabels = { gameplay = 'Free look', freelook = 'Free look', orbit = 'Orbit', wing = 'Wing view', chase = 'Chase', flyby = 'Fly-by' }
 
 function Cams.Mode(mode, veh)
     token = token + 1
@@ -136,6 +136,30 @@ function Cams.Mode(mode, veh)
             while token == my and DoesEntityExist(veh) do
                 a = a + GetFrameTime() * 0.12
                 AttachCamToEntity(cam, veh, math.cos(a) * 110.0, math.sin(a) * 110.0, 25.0, true)
+                PointCamAtEntity(cam, veh, 0.0, 0.0, 0.0, true)
+                Wait(0)
+            end
+        end)
+    elseif mode == 'freelook' then
+        -- Mouse-controlled camera that orbits the jet. Used for passengers
+        -- attached inside the fuselage, where the normal GTA camera would clip
+        -- inside the plane. (The scroll wheel is the music volume.)
+        show(cam)
+        CreateThread(function()
+            local yaw, pitch, dist = 180.0, 12.0, 85.0      -- start behind and a little above
+            while token == my and DoesEntityExist(veh) do
+                local lx = GetDisabledControlNormal(0, 1)   -- look left/right
+                local ly = GetDisabledControlNormal(0, 2)   -- look up/down
+                yaw = (yaw - lx * 10.0) % 360.0
+                pitch = math.max(-10.0, math.min(65.0, pitch + ly * 8.0))
+
+                local pos = GetEntityCoords(veh)
+                local h = math.rad(GetEntityHeading(veh) + yaw)
+                local p = math.rad(pitch)
+                local x = pos.x - math.sin(h) * math.cos(p) * dist
+                local y = pos.y + math.cos(h) * math.cos(p) * dist
+                local z = pos.z + math.sin(p) * dist
+                SetCamCoord(cam, x, y, z)
                 PointCamAtEntity(cam, veh, 0.0, 0.0, 0.0, true)
                 Wait(0)
             end

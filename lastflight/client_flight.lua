@@ -27,8 +27,12 @@ resetF()
 
 function LFC.InFlight() return F.active end
 
+-- Seated passengers use the normal GTA camera. Passengers attached inside the
+-- fuselage (when the jet runs out of real seats) get a mouse-controlled
+-- free-look camera instead, because the GTA camera would clip inside the plane.
 local function defaultCamMode()
-    if F.mode == 'attach' or not SF.allowFreeLook then return 'chase' end
+    if not SF.allowFreeLook then return 'chase' end
+    if F.mode == 'attach' then return 'freelook' end
     return 'gameplay'
 end
 
@@ -90,7 +94,7 @@ RegisterNetEvent('lastflight:client:board', function(data)
             SetPedConfigFlag(ped, 184, true)        -- never shuffle into the pilot seat
             SetEntityInvincible(ped, true)
             savedViewMode = savedViewMode or GetFollowVehicleCamViewMode()
-            if F.mode == 'attach' then Cams.Mode('chase', veh) end
+            if F.mode == 'attach' then Cams.Mode('freelook', veh) end
             LFC.Nui('readyShow', { flight = data.flight, destination = data.destination })
             LFC.Focus(true)
             LFC.Notify(('Welcome aboard flight %s. Press READY (or %s) when you are set.'):format(data.flight, Config.Keys.ready), 'success')
@@ -338,7 +342,9 @@ function LFC.CycleCamera()
     if not veh then return end
     local modes = {}
     for _, m in ipairs(Cams.modes) do
-        if m ~= 'gameplay' or (F.mode ~= 'attach' and SF.allowFreeLook) then modes[#modes + 1] = m end
+        -- one "free look" entry: the GTA camera for seated players, the orbit camera for attached ones
+        local wantFree = SF.allowFreeLook and (F.mode == 'attach' and m == 'freelook' or F.mode ~= 'attach' and m == 'gameplay')
+        if wantFree or (m ~= 'gameplay' and m ~= 'freelook') then modes[#modes + 1] = m end
     end
     local idx = 1
     for i, m in ipairs(modes) do if m == F.camMode then idx = i end end
@@ -505,6 +511,47 @@ CreateThread(function()
             end
             Wait(0)
         else
+            Wait(500)
+        end
+    end
+end)
+
+-- Scroll wheel = this player's music volume (only while the music plays).
+-- Saved on the player's own PC so it's remembered next flight.
+local musicLevel
+do
+    local ok, saved = pcall(GetResourceKvpInt, 'musicLevel')
+    musicLevel = (ok and saved and saved > 0) and math.min(100, saved) or 100
+    if ok and saved == -1 then musicLevel = 0 end
+end
+
+-- Only while you are actually aboard the jet and the music is playing
+-- (takeoff, island loop, departure) - never on the shuttle or on foot.
+local function onPlaneWithMusic()
+    if not F.active or not F.musicStarted then return false end
+    if F.phase ~= S.TAKEOFF and F.phase ~= S.CRUISING and F.phase ~= S.FINAL_DEPARTURE then return false end
+    local veh = F.veh
+    if not veh or not DoesEntityExist(veh) then return false end
+    local ped = PlayerPedId()
+    return GetVehiclePedIsIn(ped, false) == veh or IsEntityAttachedToEntity(ped, veh)
+end
+
+CreateThread(function()
+    local sent = false
+    while true do
+        if onPlaneWithMusic() then
+            if not sent then LFC.Nui('musicVolume', { level = musicLevel / 100 }); sent = true end
+            -- the wheel would otherwise switch weapons / radio in the jet
+            for _, c in ipairs({ 14, 15, 16, 17, 81, 82, 99, 100, 241, 242, 261, 262 }) do DisableControlAction(0, c, true) end
+            local step = IsDisabledControlJustPressed(0, 241) and 5 or IsDisabledControlJustPressed(0, 242) and -5 or 0
+            if step ~= 0 then
+                musicLevel = math.max(0, math.min(100, musicLevel + step))
+                pcall(SetResourceKvpInt, 'musicLevel', musicLevel == 0 and -1 or musicLevel)
+                LFC.Nui('musicVolume', { level = musicLevel / 100, show = true })
+            end
+            Wait(0)
+        else
+            sent = false
             Wait(500)
         end
     end
