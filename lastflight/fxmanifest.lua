@@ -38,5 +38,6 @@ files {
     'style.css',
     'app.js',
     'audio/*.mp3',
+    'audio/lastdrive/*.mp3',
     'audio/*.ogg',
 }

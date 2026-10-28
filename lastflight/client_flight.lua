@@ -518,7 +518,8 @@ CreateThread(function()
     end
 end)
 
--- Scroll wheel = this player's music volume (only while the music plays).
+-- Scroll wheel = this player's music volume (only while the music plays,
+-- on the jet or in the farewell highway car).
 -- Saved on the player's own PC so it's remembered next flight.
 local musicLevel
 do
@@ -541,7 +542,7 @@ end
 CreateThread(function()
     local sent = false
     while true do
-        if onPlaneWithMusic() then
+        if onPlaneWithMusic() or (LFC.TourMusicOn and LFC.TourMusicOn()) then
             if not sent then LFC.Nui('musicVolume', { level = musicLevel / 100 }); sent = true end
             -- the wheel would otherwise switch weapons / radio in the jet
             for _, c in ipairs({ 14, 15, 16, 17, 81, 82, 99, 100, 241, 242, 261, 262 }) do DisableControlAction(0, c, true) end

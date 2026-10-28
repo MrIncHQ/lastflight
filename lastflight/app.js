@@ -171,10 +171,86 @@
     let musicUser = 1;            // this player's own music volume (scroll wheel), 0..1
     let volTimer = null;
 
+    // Title / artist read from the MP3's own ID3 tag, so swapped-in songs show
+    // their real artist. Only the tag at the start of the file is downloaded.
+    const tagCache = {};
+    function readTags(file) {
+        if (!file) return Promise.resolve({});
+        if (tagCache[file]) return tagCache[file];
+        tagCache[file] = (async () => {
+            try {
+                const res = await fetch(file);
+                if (!res.ok || !res.body) return {};
+                const reader = res.body.getReader();
+                let buf = new Uint8Array(0);
+                let need = 10;
+                while (buf.length < need) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const n = new Uint8Array(buf.length + value.length);
+                    n.set(buf); n.set(value, buf.length); buf = n;
+                    if (need === 10 && buf.length >= 10) {
+                        if (buf[0] !== 0x49 || buf[1] !== 0x44 || buf[2] !== 0x33) break;   // no "ID3"
+                        need = Math.min(10 + ((buf[6] << 21) | (buf[7] << 14) | (buf[8] << 7) | buf[9]), 8 * 1024 * 1024);
+                    }
+                }
+                reader.cancel().catch(() => {});
+                return parseId3(buf);
+            } catch (_) { return {}; }
+        })();
+        return tagCache[file];
+    }
+
+    function parseId3(b) {
+        const out = {};
+        if (b.length < 10 || b[0] !== 0x49 || b[1] !== 0x44 || b[2] !== 0x33) return out;
+        const v = b[3];
+        if (v < 3) return out;                                  // ID3v2.2 uses 3-letter frames: skip
+        const end = Math.min(b.length, 10 + ((b[6] << 21) | (b[7] << 14) | (b[8] << 7) | b[9]));
+        const text = (d) => {
+            const enc = d[0];
+            let body = d.subarray(1);
+            let label = 'iso-8859-1';
+            if (enc === 3) label = 'utf-8';
+            else if (enc === 2) label = 'utf-16be';
+            else if (enc === 1) {
+                label = body[0] === 0xFE && body[1] === 0xFF ? 'utf-16be' : 'utf-16le';
+                if ((body[0] === 0xFF && body[1] === 0xFE) || (body[0] === 0xFE && body[1] === 0xFF)) body = body.subarray(2);
+            }
+            try { return new TextDecoder(label).decode(body).replace(/\0+$/g, '').split('\0')[0].trim(); } catch (_) { return ''; }
+        };
+        let i = 10;
+        while (i + 10 <= end) {
+            const id = String.fromCharCode(b[i], b[i + 1], b[i + 2], b[i + 3]);
+            if (!/^[A-Z0-9]{4}$/.test(id)) break;
+            const size = v === 4
+                ? (b[i + 4] << 21) | (b[i + 5] << 14) | (b[i + 6] << 7) | b[i + 7]
+                : ((b[i + 4] << 24) >>> 0) + (b[i + 5] << 16) + (b[i + 6] << 8) + b[i + 7];
+            if (size <= 0 || i + 10 + size > end) break;
+            if (id === 'TPE1') out.artist = text(b.subarray(i + 10, i + 10 + size));
+            if (id === 'TIT2') out.title = text(b.subarray(i + 10, i + 10 + size));
+            if (out.artist && out.title) break;
+            i += 10 + size;
+        }
+        return out;
+    }
+
+    function showArtist() {
+        const by = $('vol-by');
+        const file = playlist && playlist.file;
+        if (!file) { by.classList.add('hidden'); return; }
+        readTags(file).then((t) => {
+            if (!playlist || playlist.file !== file) return;
+            by.textContent = t.artist ? `Music by: ${t.artist}` : '';
+            by.classList.toggle('hidden', !t.artist);
+        });
+    }
+
     function setMusicVolume({ level = 1, show: pop = false }) {
         musicUser = Math.max(0, Math.min(1, level));
         if (playlist && tracks.music && !playlist.fading) tracks.music.volume = playlist.base * musicUser;
         if (!pop) return;
+        showArtist();
         $('vol-pct').textContent = `${Math.round(musicUser * 100)}%`;
         $('vol-fill').style.width = `${musicUser * 100}%`;
         show('vol');
@@ -201,6 +277,8 @@
         const start = (idx, startAt) => {
             if (pl.cancel || idx >= list.length) return;
             const t = list[idx];
+            pl.file = t.file;
+            readTags(t.file);                 // so "Music by" is ready when the volume pops up
             const a = new Audio(t.file);
             a.volume = pl.base * musicUser;
             tracks.music = a;
@@ -421,6 +499,9 @@
             case 'landmark': {
                 const el = $('landmark');
                 $('landmark-label').textContent = data.label;
+                $('landmark-quote').textContent = data.quote || '';
+                $('landmark-quote').classList.toggle('hidden', !data.quote);
+                el.classList.toggle('long', !!data.quote);   // quotes stay up longer so they can be read
                 el.classList.add('hidden');
                 void el.offsetWidth;          // restart animation
                 el.classList.remove('hidden');

@@ -426,6 +426,43 @@ Config.Tour = {
         aheadMax   = 220.0,
         width      = 25.0,          -- (clearAll = false) metres either side of the car's path
     },
+
+    -- Music for the drive: starts as the car pulls away, plays back to back, fades out at the
+    -- drop-off. Riders change their own volume with the scroll wheel (same as on the jet).
+    music = {
+        volume = 0.5,
+        tracks = {
+            { file = 'audio/lastdrive/TheCityWeLeaveBehind.mp3',   duration = 360 },   -- leaving the city
+            { file = 'audio/lastdrive/WheretheRoadsRemember.mp3',  duration = 360 },   -- up the west coast
+            { file = 'audio/lastdrive/EchoesofSanAndreas.mp3',     duration = 360 },   -- the north and the desert
+            { file = 'audio/lastdrive/OneLastRide.mp3',            duration = 289 },   -- the way home
+        },
+        fadeOut = 4,                -- seconds the music fades over at the drop-off
+    },
+
+    -- "Now passing" pop-ups (bottom left, same as on the jet) with a short line underneath.
+    -- Shown once each when the car comes within viewRadius metres.
+    viewRadius = 250.0,
+    viewpoints = {
+        { pos = vec3(8.35, -753.06, 30.87),     label = 'Downtown Los Santos',  quote = 'Every street here holds a story we wrote together.' },
+        { pos = vec3(-733.45, -648.70, 29.16),  label = 'Little Seoul',         quote = 'The late nights, the loud laughs. They all happened here.' },
+        { pos = vec3(-1529.93, -643.07, 28.05), label = 'Del Perro',            quote = 'Some of our best days started with nowhere to be.' },
+        { pos = vec3(-2113.33, -359.32, 11.91), label = 'Pacific Bluffs',       quote = 'The ocean was always there, waiting for us to slow down.' },
+        { pos = vec3(-3093.21, 1261.37, 19.25), label = 'Chumash',              quote = 'Quiet places remember loud friendships.' },
+        { pos = vec3(-2675.07, 2479.03, 15.69), label = 'Lago Zancudo',         quote = 'We crossed so many bridges together. This is one more.' },
+        { pos = vec3(-2595.46, 3044.39, 15.09), label = 'Fort Zancudo',         quote = 'For the ones who stood their ground with us.' },
+        { pos = vec3(-1568.76, 4923.02, 60.50), label = 'Paleto Forest',        quote = 'Some roads are long so we can say what matters.' },
+        { pos = vec3(-149.12, 6219.83, 30.20),  label = 'Paleto Bay',           quote = 'Small towns, big memories.' },
+        { pos = vec3(1027.13, 6481.43, 19.99),  label = 'Mount Chiliad',        quote = 'We climbed it once just to watch the sun come up. Worth it.' },
+        { pos = vec3(2522.27, 5420.28, 43.55),  label = 'Grapeseed',            quote = 'Home was never one place. It was the people in the car.' },
+        { pos = vec3(2822.53, 3510.50, 53.59),  label = 'Sandy Shores',         quote = 'To everyone we lost along the way: you rode with us every mile.' },
+        { pos = vec3(2103.71, 2689.25, 49.35),  label = 'Grand Senora Desert',  quote = 'Out here the sky is big enough for every memory.' },
+        { pos = vec3(1500.68, 853.72, 76.11),   label = 'Tataviam Mountains',   quote = 'Look back once. Then keep going.' },
+        { pos = vec3(759.68, -0.76, 62.01),     label = 'Vinewood Hills',       quote = 'We were never famous. We were something better: together.' },
+        { pos = vec3(1053.20, -1489.87, 27.17), label = 'East Los Santos',      quote = 'Thank you for every ride, every rescue, every "one more".' },
+        { pos = vec3(546.98, -2660.77, 37.53),  label = 'Port of Los Santos',   quote = 'Ships leave the harbour. The harbour remembers.' },
+        { pos = vec3(-942.56, -2351.21, 19.14), label = 'Los Santos International', quote = 'This isn\'t goodbye. It\'s see you on the other side.' },
+    },
 }
 
 ---------------------------------------------------------------------------

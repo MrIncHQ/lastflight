@@ -31,10 +31,19 @@ local function hideBuckle()
     end
 end
 
+local radioMuted = false
+
 local function clearTour()
     if not T then return end
     for _, b in pairs(T.blips) do RemoveBlip(b) end
     hideBuckle()
+    if T.music then
+        LFC.Nui('audioFade', { kind = 'music', duration = ((TC.music and TC.music.fadeOut) or 4) * 1000 })
+    end
+    if radioMuted then
+        SetUserRadioControlEnabled(true)
+        radioMuted = false
+    end
     T = nil
 end
 
@@ -86,6 +95,56 @@ function LFC.TourBuckle()
 end
 
 function LFC.InTour() return T ~= nil end
+
+-- client_flight's scroll-wheel volume works while this is true:
+-- riding in my farewell car while it drives and the music plays
+function LFC.TourMusicOn()
+    if not T or not T.music or T.state ~= 'driving' or not T.car then return false end
+    local veh = vehOf(T.car)
+    return veh ~= 0 and GetVehiclePedIsIn(PlayerPedId(), false) == veh
+end
+
+---------------------------------------------------------------------------
+-- Music, radio and "now passing" pop-ups (every rider, while driving)
+---------------------------------------------------------------------------
+local function startMusic(t)
+    local m = TC.music
+    if t.music or not m or not m.tracks or #m.tracks == 0 then return end
+    t.music = true
+    LFC.Nui('playlist', { tracks = m.tracks, volume = m.volume or 0.5, offset = 0 })
+end
+
+local function rideExtras(t)
+    local shown, nextView, nextMute = {}, 0, 0
+    local radius = TC.viewRadius or 250.0
+    while T == t and t.state == 'driving' do
+        local now = GetGameTimer()
+        local veh = t.car and vehOf(t.car) or 0
+        if veh ~= 0 then
+            -- the car's own GTA radio would play over the music
+            if now >= nextMute then
+                nextMute = now + 2000
+                SetVehRadioStation(veh, 'OFF')
+                SetVehicleRadioEnabled(veh, false)
+                SetUserRadioControlEnabled(false)
+                radioMuted = true
+            end
+            if now >= nextView then
+                nextView = now + 1000
+                local pos = GetEntityCoords(veh)
+                for i, v in ipairs(TC.viewpoints or {}) do
+                    if not shown[i] and #(vector3(pos.x - v.pos.x, pos.y - v.pos.y, 0.0)) < radius then
+                        shown[i] = true
+                        LFC.Nui('landmark', { label = v.label, quote = v.quote })
+                        nextView = now + 9000         -- let one pop-up finish before the next
+                        break
+                    end
+                end
+            end
+        end
+        Wait(250)
+    end
+end
 
 ---------------------------------------------------------------------------
 -- Driving (one rider per car)
@@ -304,9 +363,23 @@ end
 ---------------------------------------------------------------------------
 -- Quieter roads while riding
 ---------------------------------------------------------------------------
+-- Only the game's own random traffic: population types 1-5 (random permanent,
+-- parked, patrol, scenario, ambient). Script-made vehicles (6/7) - garages,
+-- jobs, the farewell cars - never qualify.
+local function isRandomTraffic(v)
+    local pop = GetEntityPopulationType(v)
+    return pop >= 1 and pop <= 5
+end
+
+-- A player drove it last (e.g. a car someone took and parked)
+local function playerDroveIt(v)
+    local last = GetLastPedInVehicleSeat(v, -1)
+    return last ~= 0 and IsPedAPlayer(last)
+end
+
 -- Random NPC traffic around the car (or in a box ahead). Never touches player cars,
--- player-owned parked cars, or anything a script made (mission entities,
--- which includes every farewell car).
+-- cars a player last drove, or anything a script made (garage cars, job cars,
+-- every farewell car).
 local function clearAhead(myVeh)
     local tr = TC.traffic
     local removed = 0
@@ -314,7 +387,7 @@ local function clearAhead(myVeh)
     local fwd = GetEntityForwardVector(myVeh)
     for _, v in ipairs(GetGamePool('CVehicle')) do
         -- class 21 = trains: deleting carriages breaks the train line (and they never block the road)
-        if v ~= myVeh and not IsEntityAMissionEntity(v) and not GetVehicleHasBeenOwnedByPlayer(v)
+        if v ~= myVeh and not IsEntityAMissionEntity(v) and isRandomTraffic(v) and not playerDroveIt(v)
             and GetVehicleClass(v) ~= 21 then
             local d = GetEntityCoords(v) - pos
             local hit
@@ -584,6 +657,10 @@ RegisterNetEvent('lastflight:client:tourStatus', function(id, s)
         T.quiet = true
         local t = T
         CreateThread(function() quietRoads(t) end)
+        if t.car then
+            startMusic(t)
+            CreateThread(function() rideExtras(t) end)
+        end
     end
     if was == 'waiting' and T.state == 'driving' then
         LFC.Notify('Here we go - one last drive around the island. Sit back and enjoy the view.', 'success')
