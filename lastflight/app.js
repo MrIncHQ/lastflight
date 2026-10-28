@@ -235,12 +235,19 @@
         return out;
     }
 
+    // Song title above the volume bar, "Music by" under it. A song without a
+    // title tag shows its file name instead (OneLastRide.mp3 -> One Last Ride).
     function showArtist() {
         const by = $('vol-by');
+        const title = $('vol-title');
         const file = playlist && playlist.file;
-        if (!file) { by.classList.add('hidden'); return; }
+        if (!file) { by.classList.add('hidden'); title.classList.add('hidden'); return; }
         readTags(file).then((t) => {
             if (!playlist || playlist.file !== file) return;
+            const name = t.title || file.split('/').pop().replace(/\.[^.]+$/, '')
+                .replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+            title.textContent = name;
+            title.classList.toggle('hidden', !name);
             by.textContent = t.artist ? `Music by: ${t.artist}` : '';
             by.classList.toggle('hidden', !t.artist);
         });

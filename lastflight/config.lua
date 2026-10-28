@@ -210,7 +210,7 @@ Config.Tour = {
     maxCars     = 8,                -- all highway cars on the road at once (server-wide)
     nextAfter   = 120,              -- a new car / convoy can be issued once the previous one has been driving this many seconds
     carSpacing  = 8.0,              -- metres between convoy cars at the pickup (lined up behind the first)
-    minutes     = 17,               -- shown to players (roughly how long the loop takes)
+    minutes     = 26,               -- shown to players (roughly how long the loop takes)
 
     spawn = vec4(222.60, -851.80, 28.80, 248.4),   -- first car, behind the airport bus bay (Legion Square)
     -- The highway loop, then the drop-off at the airport (last point).
@@ -435,6 +435,7 @@ Config.Tour = {
             { file = 'audio/lastdrive/TheCityWeLeaveBehind.mp3',   duration = 360 },   -- leaving the city
             { file = 'audio/lastdrive/WheretheRoadsRemember.mp3',  duration = 360 },   -- up the west coast
             { file = 'audio/lastdrive/EchoesofSanAndreas.mp3',     duration = 360 },   -- the north and the desert
+            { file = 'audio/lastdrive/TheEndofanEra.mp3',          duration = 360 },   -- down the east side
             { file = 'audio/lastdrive/OneLastRide.mp3',            duration = 289 },   -- the way home
         },
         fadeOut = 4,                -- seconds the music fades over at the drop-off
@@ -451,16 +452,16 @@ Config.Tour = {
         { pos = vec3(-3093.21, 1261.37, 19.25), label = 'Chumash',              quote = 'Quiet places remember loud friendships.' },
         { pos = vec3(-2675.07, 2479.03, 15.69), label = 'Lago Zancudo',         quote = 'We crossed so many bridges together. This is one more.' },
         { pos = vec3(-2595.46, 3044.39, 15.09), label = 'Fort Zancudo',         quote = 'For the ones who stood their ground with us.' },
-        { pos = vec3(-1568.76, 4923.02, 60.50), label = 'Paleto Forest',        quote = 'Some roads are long so we can say what matters.' },
+        { pos = vec3(-1568.76, 4923.02, 60.50), label = 'Paleto Forest',        quote = 'The trees grew old while we weren\'t looking. So did we.' },
         { pos = vec3(-149.12, 6219.83, 30.20),  label = 'Paleto Bay',           quote = 'Small towns, big memories.' },
         { pos = vec3(1027.13, 6481.43, 19.99),  label = 'Mount Chiliad',        quote = 'We climbed it once just to watch the sun come up. Worth it.' },
         { pos = vec3(2522.27, 5420.28, 43.55),  label = 'Grapeseed',            quote = 'Home was never one place. It was the people in the car.' },
         { pos = vec3(2822.53, 3510.50, 53.59),  label = 'Sandy Shores',         quote = 'To everyone we lost along the way: you rode with us every mile.' },
-        { pos = vec3(2103.71, 2689.25, 49.35),  label = 'Grand Senora Desert',  quote = 'Out here the sky is big enough for every memory.' },
+        { pos = vec3(1978.63, 2579.10, 53.54),  label = 'Bolingbroke Penitentiary', quote = 'Some of us did time here. All of us did it together.' },
         { pos = vec3(1500.68, 853.72, 76.11),   label = 'Tataviam Mountains',   quote = 'Look back once. Then keep going.' },
         { pos = vec3(759.68, -0.76, 62.01),     label = 'Vinewood Hills',       quote = 'We were never famous. We were something better: together.' },
         { pos = vec3(1053.20, -1489.87, 27.17), label = 'East Los Santos',      quote = 'Thank you for every ride, every rescue, every "one more".' },
-        { pos = vec3(546.98, -2660.77, 37.53),  label = 'Port of Los Santos',   quote = 'Ships leave the harbour. The harbour remembers.' },
+        { pos = vec3(770.75, -2621.51, 51.55),  label = 'Miriam Turner Overpass', quote = 'From up here you can see how far we\'ve come.' },
         { pos = vec3(-942.56, -2351.21, 19.14), label = 'Los Santos International', quote = 'This isn\'t goodbye. It\'s see you on the other side.' },
     },
 }
@@ -683,7 +684,7 @@ Config.Farewell = {
                     .. 'Thank you for the memories.',
     font             = "'Pricedown', 'Bebas Neue', 'Oswald', sans-serif",
     color            = '#ffffff',
-    displayDuration  = 14,     -- seconds the message stays on the black screen (long enough to read)
+    displayDuration  = 25,     -- seconds the message stays on the black screen (the lines under it fade in ~5s after it appears)
     disconnectOnCompletion = true,
     disconnectReason = 'Thank you for every memory we made in Los Santos. For the friends beside us and the ones we lost along the way, this one is for you. Enjoy your new adventure in GTA VI.',
     allowReconnect   = true,   -- false: player can't rejoin for reconnectCooldown seconds (never permanent)

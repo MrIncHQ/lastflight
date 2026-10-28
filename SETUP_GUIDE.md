@@ -69,6 +69,18 @@ During the highway drive, place names and short quotes pop up as the car passes.
 
 Restart the resource after changing them: `restart lastflight`.
 
+## How long it takes
+
+Plan your event around these times:
+
+| Trip | Time |
+|---|---|
+| **The flight**: buy a ticket at the airport desk, gate shuttle, boarding, the flight and the farewell message | about **15 minutes** |
+| **Highway drive**: Legion Square around the island to the airport desk | about **26 minutes** |
+| **Highway drive, then the flight** | about **41 minutes** |
+
+Players who take the airport bus from Legion Square instead of the highway drive add the bus ride on top of the 15 minutes.
+
 ## If something goes wrong
 
 | Problem | Fix |
