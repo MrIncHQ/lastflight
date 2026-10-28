@@ -18,6 +18,13 @@ local FIELDS = {
     { key = 'cityDropoff',    group = 'City pickup', kind = 'vec3', ground = true, label = 'Airport drop-off',
       hint = 'Where the taxi lets players out at LSIA (by the check-in desk).' },
 
+    { key = 'tourSpawn',      group = 'Highway drive', kind = 'vec4', ground = true, label = 'Farewell car pickup',
+      hint = 'Sit in a car where the first farewell car should wait, facing the way it leaves. Extra convoy cars line up behind it. Players start it from the city NPC (G).' },
+    { key = 'tourRoute',      group = 'Highway drive', kind = 'list', ground = true, label = 'Highway loop (via points)', spacing = 150.0,
+      hint = 'Clear it, then Record with Auto on and drive the exact roads you want from the pickup onto the highway and all the way around (a point every 150 m). The driver follows your points.' },
+    { key = 'tourDropoff',    group = 'Highway drive', kind = 'vec3', ground = true, label = 'Highway drive drop-off',
+      hint = 'Where the farewell cars let players out at the end (by the check-in desk).' },
+
     { key = 'npc',           group = 'Airport',  kind = 'vec4', label = 'Check-in desk agent',
       hint = 'Stand where the agent should stand, facing the customers.' },
     { key = 'safeReturn',     group = 'Airport',  kind = 'vec4', label = 'Return / test-mode spawn',
@@ -95,7 +102,7 @@ local function push()
     if not Setup.open then return end
     LFC.Nui('setup', {
         show = true, fields = FIELDS, draft = Setup.draft, saved = Setup.saved, busy = Setup.busy,
-        dirty = Setup.dirty, active = Setup.active, auto = Setup.auto, route = Setup.route,
+        dirty = Setup.dirty, active = Setup.active, auto = Setup.auto, insert = Setup.insert, route = Setup.route,
         focused = Setup.focused, stats = stats(),
         mode = Setup.mode, modes = LF.Modes, modeOrder = LF.ModeOrder, returnTo = Setup.returnTo,
         keys = { panel = Config.Admin.setupKey, point = Config.Admin.setupPointKey },
@@ -114,6 +121,36 @@ local function changed()
     push()
 end
 
+-- Where each route starts and ends (used to place inserted points)
+local ROUTE_ENDS = {
+    cityRoute    = { 'citySpawn', 'cityDropoff' },
+    tourRoute    = { 'tourSpawn', 'tourDropoff' },
+    shuttleRoute = { 'shuttleSpawn', 'shuttleDropoff' },
+    taxiRoute    = { 'parking', 'holdPoint' },
+}
+
+-- The list index where p fits best: the gap whose detour through p is smallest
+local function bestGap(key, p)
+    local list, ends = Setup.draft[key], ROUTE_ENDS[key]
+    local chain = {}
+    if ends and Setup.draft[ends[1]] then chain[#chain + 1] = Setup.draft[ends[1]] end
+    local offset = #chain           -- chain index -> list index
+    for _, q in ipairs(list) do chain[#chain + 1] = q end
+    if ends and Setup.draft[ends[2]] then chain[#chain + 1] = Setup.draft[ends[2]] end
+    if #chain < 2 then return #list + 1 end
+    local here = vec(p)
+    local best, bestCost = #list + 1, math.huge
+    for j = 1, #chain - 1 do
+        local a, b = vec(chain[j]), vec(chain[j + 1])
+        local cost = #(here - a) + #(here - b) - #(b - a)
+        if cost < bestCost then
+            bestCost = cost
+            best = math.max(1, math.min(j - offset + 1, #list + 1))
+        end
+    end
+    return best
+end
+
 local function addPoint()
     local key = Setup.active
     local f = key and FIELD[key]
@@ -122,13 +159,36 @@ local function addPoint()
     if #list >= LF.LayoutFields[key].max then
         return LFC.Notify('That route already has the maximum number of points.', 'error')
     end
-    list[#list + 1] = capture(f)
+    local p = capture(f)
+    if Setup.insert then
+        local at = bestGap(key, p)
+        table.insert(list, at, p)
+        local where = at == 1 and 'at the start' or at == #list and 'at the end'
+            or ('between %d and %d'):format(at - 1, at + 1)
+        LFC.Notify(('Inserted as point %d (%s).'):format(at, where), 'success')
+    else
+        list[#list + 1] = p
+    end
     PlaySoundFrontend(-1, 'SELECT', 'HUD_FRONTEND_DEFAULT_SOUNDSET', true)
     changed()
 end
 
+local function deleteNearest(key)
+    local list = Setup.draft[key]
+    local me = GetEntityCoords(PlayerPedId())
+    local best, bestD
+    for i, q in ipairs(list) do
+        local d = #(vec(q) - me)
+        if not bestD or d < bestD then best, bestD = i, d end
+    end
+    if not best then return end
+    table.remove(list, best)
+    LFC.Notify(('Removed point %d (%.0f m from you).'):format(best, bestD), 'success')
+    changed()
+end
+
 local function close()
-    Setup.open, Setup.active, Setup.auto = false, nil, false
+    Setup.open, Setup.active, Setup.auto, Setup.insert = false, nil, false, false
     LFC.Nui('setup', { show = false })
     if Setup.focused then LFC.Focus(false) end
     Setup.focused = false
@@ -149,7 +209,7 @@ RegisterNetEvent('lastflight:client:setupOpen', function(data)
     Setup.defaults = copy(data.defaults)
     Setup.saved, Setup.busy, Setup.route = data.saved, data.busy, data.route
     Setup.mode, Setup.returnTo = data.mode, data.returnTo
-    Setup.dirty, Setup.active, Setup.auto = false, nil, false
+    Setup.dirty, Setup.active, Setup.auto, Setup.insert = false, nil, false, false
     Setup.open = true
     LFC.Nui('hidePanels')
     setFocus(true)
@@ -183,12 +243,17 @@ local function toConfigText(d)
     end
     local via = list(d.shuttleRoute, '    ')
     local cityVia = list(d.cityRoute, '    ')
+    local tourVia = list(d.tourRoute, '    ')
     return table.concat({
         '-- Paste these into config.lua (Last Flight setup export)',
         'Config.Transport.city.npc   = ' .. v4s(d.cityNpc),
         'Config.Transport.city.spawn = ' .. v4s(d.citySpawn),
         'Config.Transport.city.waypoints = {',
         cityVia .. (cityVia ~= '' and '\n' or '') .. '    ' .. v3s(d.cityDropoff) .. ',   -- airport drop-off',
+        '}',
+        'Config.Tour.spawn = ' .. v4s(d.tourSpawn),
+        'Config.Tour.waypoints = {',
+        tourVia .. (tourVia ~= '' and '\n' or '') .. '    ' .. v3s(d.tourDropoff) .. ',   -- drop-off',
         '}',
         'Config.Airport.npc.coords     = ' .. v4s(d.npc),
         'Config.Airport.blip.coords    = ' .. v3s(d.npc),
@@ -225,14 +290,21 @@ RegisterNUICallback('setupAction', function(data, cb)
             push()
         end
     elseif a == 'record' and f and f.kind == 'list' then
-        Setup.active = key
+        Setup.active, Setup.insert = key, false
         setFocus(false)
         LFC.Notify(('Recording "%s": press %s at each point, %s to reopen the panel.')
             :format(f.label, Config.Admin.setupPointKey, Config.Admin.setupKey), 'info')
+    elseif a == 'insert' and f and f.kind == 'list' then
+        Setup.active, Setup.insert, Setup.auto = key, true, false
+        setFocus(false)
+        LFC.Notify(('Inserting into "%s": go where the new point belongs and press %s. It slots between the two points it fits best. %s reopens the panel.')
+            :format(f.label, Config.Admin.setupPointKey, Config.Admin.setupKey), 'info')
+    elseif a == 'nearest' and f and f.kind == 'list' then
+        deleteNearest(key)
     elseif a == 'stop' then
-        Setup.active, Setup.auto = nil, false
+        Setup.active, Setup.auto, Setup.insert = nil, false, false
         push()
-    elseif a == 'auto' then
+    elseif a == 'auto' and not Setup.insert then
         Setup.auto = not Setup.auto
         push()
     elseif a == 'undo' and f and f.kind == 'list' then
@@ -334,12 +406,12 @@ CreateThread(function()
             local near = function(p) return p and #(vec(p) - me) < 500.0 end
 
             -- auto record
-            if Setup.auto and Setup.active then
+            if Setup.auto and Setup.active and not Setup.insert then
                 local list = d[Setup.active]
                 local f = FIELD[Setup.active]
                 local here = capture(f)
                 local last = list[#list]
-                if not last or #(vec(here) - vec(last)) >= Config.Admin.autoRecordSpacing then addPoint() end
+                if not last or #(vec(here) - vec(last)) >= (f.spacing or Config.Admin.autoRecordSpacing) then addPoint() end
             end
 
             -- single points
@@ -359,6 +431,17 @@ CreateThread(function()
                 end
                 cprev = p
             end
+
+            -- highway drive: pickup -> loop -> drop-off (purple)
+            local tprev = d.tourSpawn
+            for i, p in ipairs(d.tourRoute) do
+                if near(p) or near(tprev) then
+                    line(tprev, p, 170, 110, 255)
+                    marker(p, 170, 110, 255, ('Highway %d'):format(i))
+                end
+                tprev = p
+            end
+            if near(tprev) or near(d.tourDropoff) then line(tprev, d.tourDropoff, 170, 110, 255) end
 
             -- shuttle: pickup -> via -> drop-off (blue)
             local prev = d.shuttleSpawn
@@ -391,9 +474,10 @@ CreateThread(function()
             if not Setup.focused then
                 local msg
                 if Setup.active then
-                    msg =('Recording ~y~%s~s~ - %d points%s~n~%s add point  |  %s open panel'):format(
+                    msg =('%s ~y~%s~s~ - %d points%s~n~%s %s  |  %s open panel'):format(
+                        Setup.insert and 'Inserting into' or 'Recording',
                         FIELD[Setup.active].label, #d[Setup.active], Setup.auto and ' ~g~(auto)~s~' or '',
-                        Config.Admin.setupPointKey, Config.Admin.setupKey)
+                        Config.Admin.setupPointKey, Setup.insert and 'insert point here' or 'add point', Config.Admin.setupKey)
                 else
                     msg = ('Last Flight setup - %s open the panel~n~Use the logbook again to close'):format(Config.Admin.setupKey)
                 end

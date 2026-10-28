@@ -887,6 +887,9 @@ RegisterNetEvent('lastflight:server:requestShuttle', function(kind)
         if not CT.enabled or not Config.Enabled then return end
         local c = pedCoords(src)
         if not c or #(c - vector3(CT.npc.x, CT.npc.y, CT.npc.z)) > CT.interactDistance + 4.0 then return end
+        if LFS.InTour and LFS.InTour(src) then
+            return Bridge.Notify(src, 'You are already booked on the farewell highway drive.', 'error')
+        end
         if CT.requireTicket and not ticketOf(src) then
             return Bridge.Notify(src, 'You need a Last Flight ticket for this taxi. Tickets are sold at LSIA.', 'error')
         end
@@ -1081,7 +1084,7 @@ RegisterNetEvent('lastflight:server:rideSeated', function(id, seated)
     rideStatus(ride)
 end)
 
--- Seated rider pressed the buckle key (G). The bus leaves when everyone is buckled.
+-- Seated rider pressed the seatbelt key (B). The bus leaves when everyone is buckled.
 RegisterNetEvent('lastflight:server:rideBuckle', function(id)
     local src = source
     local ride = Rides[id]
@@ -1180,6 +1183,7 @@ CreateThread(function()
 end)
 
 function LFS.RideCount() return countTable(Rides) end
+function LFS.InRide(src) return rideOf(src) ~= nil end
 
 -- Is the gate shuttle bringing ticket holders (on the way, or just dropped
 -- them off and they are walking over)? The plane holds boarding for them.

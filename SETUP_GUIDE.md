@@ -42,6 +42,8 @@ Any server admin can set it up.
 4. To move a location, stand where you want it and click **Set here**. For routes, click **Record**, drive the path and press **F6** at each point. Press **F7** to bring the panel back.
 5. Click **Save as default**.
 
+**Highway drive:** the Legion Square driver also offers a farewell drive around the island (press **G** at the NPC). To change its loop, open the **Highway drive** section, click **Clear** on the loop, then **Record** with **Auto** on and drive the highways once. Save when you're back.
+
 ## If something goes wrong
 
 | Problem | Fix |
@@ -51,3 +53,4 @@ Any server admin can set it up.
 | Items or images missing | Redo step 2 and restart ox_inventory |
 | "No permission" | You need to be a server admin |
 | Players got kicked while testing | Switch the mode to **Test** |
+| Highway car leaves the highway | Re-record the **Highway drive** loop (see step 5) |

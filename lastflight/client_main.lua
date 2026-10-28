@@ -195,6 +195,11 @@ RegisterCommand('lastflight_ready', function()
 end, false)
 RegisterKeyMapping('lastflight_ready', 'Last Flight: toggle ready', 'keyboard', Config.Keys.ready)
 
+RegisterCommand('lastflight_seatbelt', function()
+    if LFC.Buckle then LFC.Buckle() end
+end, false)
+RegisterKeyMapping('lastflight_seatbelt', 'Last Flight: fasten seatbelt', 'keyboard', Config.Keys.seatbelt or 'B')
+
 RegisterCommand('lastflight_camera', function()
     if LFC.CycleCamera then LFC.CycleCamera() end
 end, false)

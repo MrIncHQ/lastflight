@@ -4,7 +4,7 @@
 --
 -- ONE shared bus per stop (the server decides). The first rider's client
 -- spawns it; everyone who asks while it waits gets on the same bus. Seated
--- riders press G to buckle and it leaves once everyone is buckled. One rider's
+-- riders press B to buckle and it leaves once everyone is buckled. One rider's
 -- client drives it (the "controller"); if they get off or drop, another takes over.
 
 local SH = Config.Transport.shuttle
@@ -283,7 +283,7 @@ local function riderLoop(r)
                 r.buckling = true
                 r.promptShown = true
                 TriggerServerEvent('lastflight:server:rideSeated', r.id, true)
-                LFC.Nui('buckle', { show = true, key = Config.Keys.ready })
+                LFC.Nui('buckle', { show = true, key = Config.Keys.seatbelt })
             elseif not inside and r.seated then
                 hideBuckle(r)
                 r.seated, r.buckling = false, false
@@ -495,6 +495,14 @@ local function spawnCityPed()
                 distance = CT.interactDistance,
                 onSelect = requestCityRide,
             },
+            {
+                name = 'lastflight_tour',
+                label = 'Farewell highway drive',
+                icon = 'fa-solid fa-car',
+                distance = CT.interactDistance,
+                canInteract = function() return Config.Tour.enabled end,
+                onSelect = function() LFC.OpenTour() end,
+            },
         })
         cityTarget = true
     end
@@ -502,7 +510,9 @@ end
 
 local function despawnCityPed()
     if cityPed and DoesEntityExist(cityPed) then
-        if cityTarget then pcall(function() exports.ox_target:removeLocalEntity(cityPed, 'lastflight_city') end) end
+        if cityTarget then
+            pcall(function() exports.ox_target:removeLocalEntity(cityPed, { 'lastflight_city', 'lastflight_tour' }) end)
+        end
         DeleteEntity(cityPed)
     end
     cityPed, cityTarget = nil, false
@@ -519,9 +529,14 @@ CreateThread(function()
             despawnCityPed()
         end
         if cityPed and not cityTarget and dist < CT.interactDistance and not LFC.focus then
+            local tour = Config.Tour.enabled
             while #(GetEntityCoords(PlayerPedId()) - pos) < CT.interactDistance and not LFC.focus do
-                LFC.HelpText('~INPUT_CONTEXT~ Ride to Los Santos International Airport')
+                LFC.HelpText(tour and '~INPUT_CONTEXT~ Ride to Los Santos International Airport~n~~INPUT_DETONATE~ Farewell highway drive'
+                    or '~INPUT_CONTEXT~ Ride to Los Santos International Airport')
                 if IsControlJustReleased(0, Config.Interaction.key) then requestCityRide(); Wait(1000) end
+                if tour and IsControlJustReleased(0, Config.Tour.key) and not IsPedInAnyVehicle(PlayerPedId(), false) then
+                    LFC.OpenTour(); Wait(1000)
+                end
                 Wait(0)
             end
         end

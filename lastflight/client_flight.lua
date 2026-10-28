@@ -113,19 +113,21 @@ RegisterNetEvent('lastflight:client:manifest', function(data)
     LFC.Nui('manifest', data)
 end)
 
-function LFC.ToggleReady()
-    if not F.active then
-        if LFC.RideBuckle then LFC.RideBuckle() end   -- G also buckles you on the shuttle bus
-        return
-    end
-    if F.buckling then                       -- same key fastens the seatbelt at the runway
+-- Seatbelt key: the runway buckle, the shuttle buses and the farewell car
+function LFC.Buckle()
+    if F.active and F.buckling then
         F.buckling = false
         TriggerServerEvent('lastflight:server:buckle', F.flightId)
         PlaySoundFrontend(-1, 'CLICK_BACK', 'WEB_NAVIGATION_SOUNDS_PHONE', true)
         LFC.Nui('buckle', { done = true })
         return
     end
-    if F.locked then return end
+    if LFC.RideBuckle and LFC.RideBuckle() then return end
+    if LFC.TourBuckle then LFC.TourBuckle() end
+end
+
+function LFC.ToggleReady()
+    if not F.active or F.locked then return end
     TriggerServerEvent('lastflight:server:setReady', F.flightId, not F.ready)
 end
 
@@ -293,9 +295,9 @@ RegisterNetEvent('lastflight:client:seatbelt', function(flightId, requireBuckle)
     LFC.Nui('seatbelt', { on = true })
     if requireBuckle then
         F.buckling = true
-        LFC.Nui('buckle', { show = true, key = Config.Keys.ready })
+        LFC.Nui('buckle', { show = true, key = Config.Keys.seatbelt })
     else
-        LFC.Nui('buckle', { show = true, key = Config.Keys.ready, info = true })
+        LFC.Nui('buckle', { show = true, key = Config.Keys.seatbelt, info = true })
         SetTimeout(4000, function() LFC.Nui('buckle', { show = false }) end)
     end
 end)

@@ -83,6 +83,7 @@ Config.Interaction = {
 
 Config.Keys = {          -- players can rebind these in GTA Settings > Key Bindings > FiveM
     ready  = 'G',         -- toggle "ready" while seated
+    seatbelt = 'B',       -- fasten the seatbelt (runway, shuttles, farewell car)
     camera = 'H',         -- cycle passenger camera during the scenic flight
 }
 
@@ -163,7 +164,7 @@ Config.Transport = {
         requireTicket      = false, -- true = only ticket holders can ride (tickets are sold at the airport)
         respawnAfter       = 20,    -- a NEW bus can be called once the previous one has been driving this many
                                     -- seconds (it is well clear of the stop by then, so they never stack)
-        buckleTimeout      = 45,    -- the bus leaves when every rider has buckled (G), or this many seconds after the first one did
+        buckleTimeout      = 45,    -- the bus leaves when every rider has buckled (B), or this many seconds after the first one did
         minWait            = 30,    -- the bus always waits at least this long at the curb so others can join
         joinGrace          = 15,    -- each new rider who asks gets at least this many seconds to get on
     },
@@ -184,11 +185,246 @@ Config.Transport = {
         stuckTime          = 15,    -- seconds without moving 3 m before it re-routes (teleport only at 2x)
         maxStuckRecoveries = 3,     -- after this many, the passenger is faded and placed at the boarding point
         despawnDelay       = 6,     -- seconds after drop-off before the shuttle is removed
-        buckleTimeout      = 45,    -- the bus leaves when every rider has buckled (G), or this many seconds after the first one did
+        buckleTimeout      = 45,    -- the bus leaves when every rider has buckled (B), or this many seconds after the first one did
         minWait            = 30,    -- the bus always waits at least this long at the curb so others can join
         joinGrace          = 15,    -- each new rider who asks gets at least this many seconds to get on
         autoBoardPlane     = false, -- false: riders get off and walk to the boarding marker. true: put straight into their seats
         walkGrace          = 45,    -- after drop-off, the plane keeps boarding open this long for riders walking over
+    },
+}
+
+---------------------------------------------------------------------------
+-- FAREWELL HIGHWAY DRIVE (second option at the city pickup NPC)
+---------------------------------------------------------------------------
+-- A chauffeured luxury car takes one last loop of the island on the highways
+-- (no stop lights), then drops everyone at the LSIA check-in desk. Players pick
+-- how many are in their group and enough cars are issued to leave together.
+-- Move it in game with /lastflight setup (Highway drive section).
+Config.Tour = {
+    enabled     = true,
+    key         = 47,               -- control pressed at the NPC (47 = G). E is still the airport shuttle.
+    vehicle     = 'superd',         -- Enus Super Diamond (any 4-door works)
+    driver      = 's_m_m_highsec_01',
+    seatsPerCar = 3,                -- passengers per car (used to work out how many cars a group needs)
+    maxGroup    = 12,               -- biggest group one player can ask for
+    maxCars     = 8,                -- all highway cars on the road at once (server-wide)
+    nextAfter   = 120,              -- a new car / convoy can be issued once the previous one has been driving this many seconds
+    carSpacing  = 8.0,              -- metres between convoy cars at the pickup (lined up behind the first)
+    minutes     = 17,               -- shown to players (roughly how long the loop takes)
+
+    spawn = vec4(222.60, -851.80, 28.80, 248.4),   -- first car, behind the airport bus bay (Legion Square)
+    -- The highway loop, then the drop-off at the airport (last point).
+    -- Recorded in game: Legion Square -> Del Perro Fwy -> Great Ocean Hwy up the
+    -- west coast -> Paleto -> Senora Fwy down the east side -> LS Freeway -> LSIA.
+    -- Re-record it with /lastflight setup (Highway drive) to change it.
+    waypoints = {
+        vec3(264.16, -863.47, 28.24),
+        vec3(263.71, -891.18, 27.89),
+        vec3(218.93, -1016.61, 28.29),
+        vec3(196.48, -1026.07, 28.36),
+        vec3(155.75, -1012.39, 28.40),
+        vec3(134.58, -1000.65, 28.39),
+        vec3(121.20, -990.05, 28.34),
+        vec3(131.63, -949.79, 28.73),
+        vec3(164.01, -842.77, 30.11),
+        vec3(145.30, -803.66, 30.21),
+        vec3(8.35, -753.06, 30.87),
+        vec3(-80.09, -717.41, 33.26),
+        vec3(-230.63, -660.56, 32.35),
+        vec3(-306.48, -651.18, 32.02),
+        vec3(-520.92, -650.07, 32.20),
+        vec3(-606.46, -650.62, 30.77),
+        vec3(-733.45, -648.70, 29.16),
+        vec3(-794.06, -653.21, 27.86),
+        vec3(-890.09, -650.53, 26.90),
+        vec3(-970.46, -668.10, 23.23),
+        vec3(-1071.13, -739.56, 18.24),
+        vec3(-1115.82, -712.24, 19.69),
+        vec3(-1210.08, -602.53, 26.11),
+        vec3(-1241.88, -564.70, 27.56),
+        vec3(-1287.08, -521.02, 31.88),
+        vec3(-1341.35, -524.01, 30.82),
+        vec3(-1416.03, -578.79, 29.50),
+        vec3(-1529.93, -643.07, 28.05),
+        vec3(-1578.02, -631.63, 29.17),
+        vec3(-1693.31, -543.47, 35.80),
+        vec3(-1723.65, -554.78, 36.36),
+        vec3(-1754.25, -550.83, 35.90),
+        vec3(-1845.22, -490.97, 26.06),
+        vec3(-1918.76, -440.95, 19.94),
+        vec3(-2042.19, -379.79, 9.97),
+        vec3(-2113.33, -359.32, 11.91),
+        vec3(-2208.96, -340.04, 12.33),
+        vec3(-2291.88, -320.52, 12.63),
+        vec3(-2482.23, -206.31, 16.94),
+        vec3(-2600.96, -132.42, 20.01),
+        vec3(-2706.27, -11.71, 14.63),
+        vec3(-2947.26, 96.88, 12.63),
+        vec3(-3023.39, 201.12, 15.10),
+        vec3(-3020.43, 249.17, 14.96),
+        vec3(-2981.89, 443.73, 14.09),
+        vec3(-2985.40, 570.55, 17.11),
+        vec3(-3032.55, 715.45, 21.84),
+        vec3(-3116.77, 829.04, 16.00),
+        vec3(-3148.75, 920.28, 13.39),
+        vec3(-3112.38, 1062.87, 19.36),
+        vec3(-3093.21, 1261.37, 19.25),
+        vec3(-3048.17, 1396.89, 20.62),
+        vec3(-2982.45, 1491.38, 26.91),
+        vec3(-3006.08, 1641.71, 31.09),
+        vec3(-3036.25, 1789.97, 33.83),
+        vec3(-2997.82, 1951.62, 28.48),
+        vec3(-2971.95, 2066.55, 39.08),
+        vec3(-2906.02, 2144.12, 38.08),
+        vec3(-2756.97, 2232.85, 22.14),
+        vec3(-2710.90, 2290.80, 17.67),
+        vec3(-2675.07, 2479.03, 15.69),
+        vec3(-2627.20, 2807.97, 15.69),
+        vec3(-2595.46, 3044.39, 15.09),
+        vec3(-2567.21, 3329.35, 12.62),
+        vec3(-2522.88, 3487.33, 12.87),
+        vec3(-2469.51, 3683.52, 13.12),
+        vec3(-2400.57, 3888.34, 23.60),
+        vec3(-2330.00, 4091.34, 32.88),
+        vec3(-2202.56, 4334.20, 49.09),
+        vec3(-2149.10, 4439.96, 62.39),
+        vec3(-2051.50, 4466.67, 56.61),
+        vec3(-1929.71, 4583.55, 56.05),
+        vec3(-1760.43, 4751.04, 56.16),
+        vec3(-1568.76, 4923.02, 60.50),
+        vec3(-1441.08, 5049.92, 60.55),
+        vec3(-1294.75, 5232.92, 53.05),
+        vec3(-1145.41, 5277.37, 52.18),
+        vec3(-1026.37, 5356.25, 42.07),
+        vec3(-763.80, 5490.69, 33.87),
+        vec3(-585.41, 5640.98, 37.64),
+        vec3(-491.64, 5839.97, 33.06),
+        vec3(-315.31, 6052.95, 30.22),
+        vec3(-149.12, 6219.83, 30.20),
+        vec3(90.38, 6458.59, 30.34),
+        vec3(225.94, 6554.57, 30.72),
+        vec3(375.29, 6565.11, 26.91),
+        vec3(583.89, 6533.82, 27.05),
+        vec3(802.75, 6490.93, 22.66),
+        vec3(1027.13, 6481.43, 19.99),
+        vec3(1333.36, 6480.92, 18.94),
+        vec3(1573.36, 6407.93, 23.98),
+        vec3(1762.95, 6346.83, 35.31),
+        vec3(1898.71, 6310.93, 41.00),
+        vec3(1988.27, 6153.74, 45.46),
+        vec3(2117.08, 6030.20, 49.93),
+        vec3(2244.28, 5926.03, 48.93),
+        vec3(2340.47, 5819.45, 45.79),
+        vec3(2440.75, 5633.18, 44.02),
+        vec3(2522.27, 5420.28, 43.55),
+        vec3(2608.18, 5099.53, 43.81),
+        vec3(2638.37, 4986.13, 43.79),
+        vec3(2704.27, 4704.73, 43.35),
+        vec3(2747.90, 4495.50, 46.10),
+        vec3(2825.34, 4253.65, 49.21),
+        vec3(2911.27, 3953.79, 50.81),
+        vec3(2877.03, 3681.03, 51.66),
+        vec3(2822.53, 3510.50, 53.59),
+        vec3(2761.71, 3368.81, 55.12),
+        vec3(2654.80, 3171.15, 50.76),
+        vec3(2466.12, 2975.43, 39.98),
+        vec3(2272.24, 2819.91, 41.48),
+        vec3(2103.71, 2689.25, 49.35),
+        vec3(1978.63, 2579.10, 53.54),
+        vec3(1846.41, 2402.01, 53.71),
+        vec3(1782.48, 2194.52, 61.04),
+        vec3(1764.14, 2035.58, 67.13),
+        vec3(1736.30, 1784.92, 76.49),
+        vec3(1681.31, 1409.00, 85.28),
+        vec3(1603.00, 1091.97, 80.54),
+        vec3(1500.68, 853.72, 76.11),
+        vec3(1382.23, 685.87, 78.39),
+        vec3(1265.36, 572.49, 79.70),
+        vec3(1079.74, 386.31, 82.15),
+        vec3(857.17, 140.27, 71.48),
+        vec3(759.68, -0.76, 62.01),
+        vec3(706.01, -94.89, 53.62),
+        vec3(639.04, -206.47, 43.44),
+        vec3(596.62, -258.87, 43.05),
+        vec3(538.86, -322.33, 42.51),
+        vec3(509.34, -392.20, 44.05),
+        vec3(505.89, -444.86, 44.90),
+        vec3(531.98, -530.19, 44.39),
+        vec3(582.07, -586.62, 41.97),
+        vec3(674.41, -632.86, 35.16),
+        vec3(781.65, -669.23, 38.69),
+        vec3(878.54, -741.81, 40.64),
+        vec3(923.48, -787.28, 37.53),
+        vec3(956.38, -826.68, 34.02),
+        vec3(974.81, -853.16, 31.77),
+        vec3(997.88, -903.34, 29.66),
+        vec3(1027.00, -993.98, 28.98),
+        vec3(1046.97, -1246.64, 24.36),
+        vec3(1053.20, -1489.87, 27.17),
+        vec3(1061.03, -1615.44, 28.28),
+        vec3(1104.69, -1767.08, 28.29),
+        vec3(1161.57, -1904.28, 33.06),
+        vec3(1235.36, -2065.94, 43.35),
+        vec3(1323.51, -2300.74, 51.38),
+        vec3(1288.57, -2470.65, 46.51),
+        vec3(1167.87, -2546.50, 33.81),
+        vec3(1069.40, -2568.17, 34.36),
+        vec3(770.75, -2621.51, 51.55),
+        vec3(546.98, -2660.77, 37.53),
+        vec3(357.00, -2663.09, 20.17),
+        vec3(148.96, -2645.97, 18.14),
+        vec3(22.86, -2608.14, 25.28),
+        vec3(-95.65, -2536.64, 40.09),
+        vec3(-543.84, -2222.76, 57.93),
+        vec3(-761.98, -2069.35, 32.22),
+        vec3(-874.89, -1982.15, 26.71),
+        vec3(-908.30, -1897.89, 28.95),
+        vec3(-888.06, -1819.31, 34.62),
+        vec3(-849.16, -1786.40, 36.19),
+        vec3(-780.25, -1764.31, 28.31),
+        vec3(-762.90, -1797.68, 27.58),
+        vec3(-743.09, -1865.37, 26.13),
+        vec3(-704.73, -2010.99, 24.45),
+        vec3(-704.60, -2062.11, 17.04),
+        vec3(-743.69, -2144.73, 12.95),
+        vec3(-772.22, -2177.07, 14.64),
+        vec3(-840.58, -2232.17, 16.57),
+        vec3(-892.82, -2277.26, 18.44),
+        vec3(-942.56, -2351.21, 19.14),
+        vec3(-1053.14, -2543.60, 19.16),
+        vec3(-1092.67, -2614.94, 19.16),
+        vec3(-1080.01, -2693.50, 19.14),
+        vec3(-1035.75, -2727.45, 19.15),   -- LSIA departures, by the check-in desk (drop-off)
+    },
+    speed        = 27.0,            -- m/s on freeways / highways (~60 mph)
+    citySpeed    = 13.4,            -- m/s on every other road (~30 mph). nil = always use speed
+    -- a road counts as highway when GTA's street name contains one of these
+    highwayNames = { 'Fwy', 'Freeway', 'Hwy', 'Highway' },
+    -- 447 = careful driving that keeps to main roads and highways. (786603, the
+    -- shuttle style, also has "shortest path" on, which cuts through side streets.)
+    drivingStyle = 447,
+    viaRadius    = 40.0,            -- how close counts as "reached" for loop points (driving past one also counts)
+    lookahead    = 1,               -- the driver aims this many points past the next one (smoother, no braking at points)
+    arriveRadius = 15.0,            -- drop-off
+    stagger      = 3,               -- seconds between convoy cars pulling away
+    stuckTime          = 20,
+    maxStuckRecoveries = 6,
+    despawnDelay       = 6,
+    buckleTimeout      = 45,        -- leaves when everyone has buckled (B), or this long after the first one did
+    minWait            = 20,        -- always waits at least this long at the curb
+    joinGrace          = 15,        -- each new rider gets at least this many seconds to get in
+    tripTimeout        = 1800,      -- seconds; riders are faded to the drop-off if a car never arrives
+
+    -- Quieter roads for the riders (only on their own screens, only while the car is moving)
+    traffic = {
+        density    = 0.0,           -- cars: 0.0 = none, 1.0 = normal
+        pedDensity = 1.0,           -- people on the sidewalks: 1.0 = leave as normal
+        clearAhead = true,          -- remove random NPC traffic around the car
+        clearAll   = true,          -- true: every NPC car within clearRadius (empty roads). false: only the box ahead below
+        clearRadius = 300.0,
+        aheadMin   = 60.0,          -- (clearAll = false) metres ahead where clearing starts, so cars don't visibly pop
+        aheadMax   = 220.0,
+        width      = 25.0,          -- (clearAll = false) metres either side of the car's path
     },
 }
 
@@ -330,7 +566,7 @@ Config.Audio = {
     announcementTimeout  = 120,  -- hard cap (s) the server waits for everyone's announcement to finish
 }
 
--- After the chime every passenger presses the READY key (G) to buckle up.
+-- After the chime every passenger presses the seatbelt key (B) to buckle up.
 -- Takeoff starts when everyone is buckled, or after `timeout` seconds.
 Config.Seatbelt = {
     requireBuckle = true,

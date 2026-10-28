@@ -21,9 +21,9 @@ RegisterCommand(Config.Admin.command, function(src, args)
     if sub == 'status' then
         if Config.Admin.statusRequiresAce and not allowed(src) then return reply(src, 'No permission.') end
         local s = LFS.Status()
-        reply(src, ('Flight #%s | state %s | passengers %d/%d (ready %d) | queue %d | tickets %d | aircraft %s | controller %s | shuttles %d | mode %s')
+        reply(src, ('Flight #%s | state %s | passengers %d/%d (ready %d) | queue %d | tickets %d | aircraft %s | controller %s | shuttles %d | highway drives %d | mode %s')
             :format(s.flightId, s.state, s.passengers, s.capacity, s.ready, s.queue, s.tickets,
-                s.aircraft, tostring(s.controller), s.shuttles, LF.Modes[LF.Mode()].label))
+                s.aircraft, tostring(s.controller), s.shuttles, LFS.TourCount and LFS.TourCount() or 0, LF.Modes[LF.Mode()].label))
         return
     end
 

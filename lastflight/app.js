@@ -91,6 +91,53 @@
     $('opt-drive').onclick = () => post('transport', { choice: 'drive' });
     $('opt-shuttle').onclick = () => post('transport', { choice: 'shuttle' });
 
+    // ---------------- Farewell highway drive ----------------
+    let tour = { size: 1, max: 12, per: 3, cars: 8 };
+
+    function renderTourSize() {
+        $('t-size').textContent = tour.size;
+        const n = Math.min(Math.ceil(tour.size / tour.per), tour.cars);
+        $('t-cars').textContent = `${n} car${n === 1 ? '' : 's'} (${tour.per} passengers each)`;
+        $('t-minus').disabled = tour.size <= 1;
+        $('t-plus').disabled = tour.size >= tour.max;
+    }
+
+    function openTour(d) {
+        tour = { size: 1, max: d.maxGroup || 12, per: d.seatsPerCar || 3, cars: Math.max(1, d.carsFree || d.maxCars || 8) };
+        tour.max = Math.min(tour.max, tour.per * tour.cars);
+        $('t-min').textContent = d.minutes || 15;
+        const note = $('t-note');
+        const start = $('t-start');
+        let msg = '';
+        start.disabled = false;
+        if (d.waiting) {
+            // a group is already lined up at the curb: join it
+            msg = d.joinable
+                ? `Farewell cars are waiting at the curb with ${d.seatsFree} free seat${d.seatsFree === 1 ? '' : 's'}. Join them!`
+                : 'The farewell cars at the curb are full. The next one can go once they have been on the road for a bit.';
+            start.textContent = 'Join the drive';
+            start.disabled = !d.joinable;
+        } else if (!d.ok) {
+            msg = d.reason === 'recent'
+                ? `The last farewell car just left. The next one can go in ${d.wait}s.`
+                : 'Every farewell car is out on the highway right now. Try again soon.';
+            start.textContent = 'Start the drive';
+            start.disabled = true;
+        } else {
+            start.textContent = 'Start the drive';
+        }
+        $('t-pick').classList.toggle('hidden', !!d.waiting);
+        note.textContent = msg;
+        note.classList.toggle('hidden', !msg);
+        renderTourSize();
+        show('tour');
+    }
+
+    $('t-minus').onclick = () => { tour.size = Math.max(1, tour.size - 1); renderTourSize(); };
+    $('t-plus').onclick = () => { tour.size = Math.min(tour.max, tour.size + 1); renderTourSize(); };
+    $('t-start').onclick = () => { hide('tour'); post('tourStart', { size: tour.size }); };
+    $('t-cancel').onclick = () => post('close');
+
     // ---------------- Readiness ----------------
     function renderManifest(d) {
         $('r-ready').textContent = d.ready;
@@ -177,7 +224,7 @@
         if (d.show) {
             el.classList.remove('done');
             el.classList.toggle('info', !!d.info);   // warning only, no key to press
-            $('b-key').textContent = d.key || cfg.keys.ready;
+            $('b-key').textContent = d.key || cfg.keys.seatbelt || 'B';
             $('b-title').textContent = 'FASTEN YOUR SEATBELT';
             $('b-count').textContent = '';
             show('buckle');
@@ -265,11 +312,15 @@
             if (f.kind === 'list') {
                 const n = (v || []).length;
                 val = `${n} point${n === 1 ? '' : 's'}`;
-                btns = active
-                    ? `<button class="rec" data-action="stop">Stop</button>
-                       <button class="${s.auto ? 'on' : ''}" data-action="auto">Auto ${s.auto ? 'ON' : 'off'}</button>`
-                    : `<button data-action="record" data-field="${f.key}">Record</button>`;
-                btns += `<button data-action="undo" data-field="${f.key}" ${n ? '' : 'disabled'}>Undo</button>
+                if (active) {
+                    btns = `<button class="rec" data-action="stop">Stop</button>`;
+                    if (!s.insert) btns += `<button class="${s.auto ? 'on' : ''}" data-action="auto">Auto ${s.auto ? 'ON' : 'off'}</button>`;
+                } else {
+                    btns = `<button data-action="record" data-field="${f.key}">Record</button>
+                            <button data-action="insert" data-field="${f.key}" ${n ? '' : 'disabled'}>Insert</button>`;
+                }
+                btns += `<button data-action="nearest" data-field="${f.key}" ${n ? '' : 'disabled'} title="Removes the point closest to where you are standing">Delete nearest</button>
+                         <button data-action="undo" data-field="${f.key}" ${n ? '' : 'disabled'}>Undo</button>
                          <button data-action="clear" data-field="${f.key}" ${n ? '' : 'disabled'}>Clear</button>
                          <button data-action="go" data-field="${f.key}" ${n ? '' : 'disabled'}>Go</button>`;
             } else {
@@ -280,7 +331,9 @@
             html += `<div class="s-row ${active ? 'active' : ''}">
                 <div class="s-top"><span class="s-label">${esc(f.label)}</span><div class="s-btns">${btns}</div></div>
                 <div class="s-val">${val}</div>
-                <div class="s-hint">${esc(f.hint || '')}${active ? ` &middot; <b>${esc(s.keys.point)}</b> adds a point${s.auto ? ` (auto every ${s.spacing} m)` : ''}` : ''}</div>
+                <div class="s-hint">${esc(f.hint || '')}${active ? (s.insert
+                    ? ` &middot; <b>${esc(s.keys.point)}</b> inserts a point where you are`
+                    : ` &middot; <b>${esc(s.keys.point)}</b> adds a point${s.auto ? ` (auto every ${f.spacing || s.spacing} m)` : ''}`) : ''}</div>
             </div>`;
         }
         $('s-body').innerHTML = html;
@@ -316,7 +369,7 @@
     }
 
     function resetAll() {
-        ['desk', 'transport', 'ready', 'seatbelt', 'buckle', 'hud', 'vol', 'landmark', 'farewell'].forEach(hide);
+        ['desk', 'transport', 'tour', 'ready', 'seatbelt', 'buckle', 'hud', 'vol', 'landmark', 'farewell'].forEach(hide);
         clearInterval(etaTimer);
         clearInterval(readyTimer);
         Object.keys(tracks).forEach(stopTrack);
@@ -347,7 +400,8 @@
                 if (data.ok && data.info && data.info.status === 'boarding') openTransport(data.info);
                 else renderDesk(data.info, data.msg, data.ok);
                 break;
-            case 'hidePanels': hide('desk'); hide('transport'); clearInterval(etaTimer); break;
+            case 'hidePanels': hide('desk'); hide('transport'); hide('tour'); clearInterval(etaTimer); break;
+            case 'tour': openTour(data); break;
             case 'readyShow':
                 $('r-flight').textContent = data.flight;
                 $('r-dest').textContent = data.destination;
@@ -405,7 +459,8 @@
         if (e.key !== 'Escape') return;
         if (!$('setup').classList.contains('hidden') && !$('setup').classList.contains('collapsed')) {
             post('setupAction', { action: 'close' });
-        } else if (!$('desk').classList.contains('hidden') || !$('transport').classList.contains('hidden')) post('close');
+        } else if (!$('desk').classList.contains('hidden') || !$('transport').classList.contains('hidden')
+            || !$('tour').classList.contains('hidden')) post('close');
         else if (!$('ready').classList.contains('hidden')) post('unfocus');
     });
 })();

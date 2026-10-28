@@ -67,6 +67,34 @@
         <div class="actions"><button class="btn ghost" id="btn-later">Later</button></div>
     </section>
 
+    <!-- FAREWELL HIGHWAY DRIVE (city NPC, second option) -->
+    <section id="tour" class="panel hidden">
+        <header class="pass-head">
+            <div class="brand">
+                <svg viewBox="0 0 24 24" class="car"><path d="M5 11l1.5-4.5h11L19 11m-1.5 5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m-11 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3M18.9 6c-.2-.6-.8-1-1.4-1h-11c-.7 0-1.2.4-1.4 1L3 12v8a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h12v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-8z"/></svg>
+                <span>ONE LAST DRIVE</span>
+            </div>
+            <span class="tag">HIGHWAY TOUR</span>
+        </header>
+        <div class="t-body">
+            <p>A chauffeur takes you on one final loop of the island on the highways. No stop lights, just the view. It ends at the airport check-in desk, about <b id="t-min">15</b> minutes.</p>
+            <div id="t-pick">
+                <label>How many people are in your group?</label>
+                <div class="t-step">
+                    <button id="t-minus">&minus;</button>
+                    <b id="t-size">1</b>
+                    <button id="t-plus">+</button>
+                </div>
+                <span class="t-cars" id="t-cars">1 car</span>
+            </div>
+            <div class="t-note hidden" id="t-note"></div>
+        </div>
+        <div class="actions">
+            <button class="btn primary" id="t-start">Start the drive</button>
+            <button class="btn ghost" id="t-cancel">Cancel</button>
+        </div>
+    </section>
+
     <!-- READINESS -->
     <section id="ready" class="hidden">
         <div class="ready-head">
@@ -94,7 +122,7 @@
         <svg viewBox="0 0 64 64"><circle cx="32" cy="12" r="6"/><path d="M24 22h16a4 4 0 0 1 4 4v14h-6v18h-4V44h-4v14h-4V40h-6V26a4 4 0 0 1 4-4z"/><path d="M20 30l24 10" class="belt"/></svg>
         <div>
             <b id="b-title">FASTEN YOUR SEATBELT</b>
-            <span class="b-press">Press <kbd id="b-key">G</kbd> to buckle up</span>
+            <span class="b-press">Press <kbd id="b-key">B</kbd> to buckle up</span>
             <span id="b-count"></span>
         </div>
     </div>
