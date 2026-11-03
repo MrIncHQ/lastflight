@@ -475,7 +475,7 @@ LF.LayoutFields = {
     cityRoute    = { kind = 'list', max = 40 },
     cityDropoff  = { kind = 'vec3' },
     tourSpawn    = { kind = 'vec4' },
-    tourRoute    = { kind = 'list', max = 250 },
+    tourRoute    = { kind = 'list', max = 1500 },
     tourDropoff  = { kind = 'vec3' },
     parking      = { kind = 'vec4' },
     taxiRoute    = { kind = 'list', max = 80 },
@@ -557,7 +557,7 @@ function LF.ApplyLayout(layout)
     CT.waypoints[#CT.waypoints + 1] = fromPlain(L.cityDropoff)
     local TC = Config.Tour
     TC.spawn = fromPlain(L.tourSpawn, true)
-    TC.waypoints = fromPlainList(L.tourRoute, 250) or {}
+    TC.waypoints = fromPlainList(L.tourRoute, 1500) or {}
     TC.waypoints[#TC.waypoints + 1] = fromPlain(L.tourDropoff)
     local A = Config.Aircraft
     A.parking      = fromPlain(L.parking, true)

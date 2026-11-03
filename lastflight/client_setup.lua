@@ -20,8 +20,8 @@ local FIELDS = {
 
     { key = 'tourSpawn',      group = 'Highway drive', kind = 'vec4', ground = true, label = 'Farewell car pickup',
       hint = 'Sit in a car where the first farewell car should wait, facing the way it leaves. Extra convoy cars line up behind it. Players start it from the city NPC (G).' },
-    { key = 'tourRoute',      group = 'Highway drive', kind = 'list', ground = true, label = 'Highway loop (via points)', spacing = 150.0,
-      hint = 'Clear it, then Record with Auto on and drive the exact roads you want from the pickup onto the highway and all the way around (a point every 150 m). The driver follows your points.' },
+    { key = 'tourRoute',      group = 'Highway drive', kind = 'list', ground = true, label = 'Highway loop (via points)', spacing = 20.0,
+      hint = 'The driver follows these points GPS-style. Clear it, then Record with Auto on (a point every 20 m) and drive the loop in the lane you want; add F6 points through tight turns. The purple line shows your recorded route.' },
     { key = 'tourDropoff',    group = 'Highway drive', kind = 'vec3', ground = true, label = 'Highway drive drop-off',
       hint = 'Where the farewell cars let players out at the end (by the check-in desk).' },
 
@@ -323,7 +323,8 @@ RegisterNUICallback('setupAction', function(data, cb)
     elseif a == 'move' then
         setFocus(false)
     elseif a == 'save' then
-        TriggerServerEvent('lastflight:server:setupSave', Setup.draft)
+        -- latent: a long recorded route is too big for a normal event
+        TriggerLatentServerEvent('lastflight:server:setupSave', 250000, Setup.draft)
     elseif a == 'revert' then
         Setup.draft = copy(Setup.original)
         Setup.dirty = false

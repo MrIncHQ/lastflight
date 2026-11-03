@@ -220,7 +220,7 @@ Config.Tour = {
     maxCars     = 8,                -- all highway cars on the road at once (server-wide)
     nextAfter   = 120,              -- a new car / convoy can be issued once the previous one has been driving this many seconds
     carSpacing  = 8.0,              -- metres between convoy cars at the pickup (lined up behind the first)
-    minutes     = 26,               -- shown to players (roughly how long the loop takes)
+    minutes     = 22,               -- shown to players (roughly how long the loop takes)
 
     spawn = vec4(222.60, -851.80, 28.80, 248.4),   -- first car, behind the airport bus bay (Legion Square)
     -- The highway loop, then the drop-off at the airport (last point).
@@ -418,7 +418,23 @@ Config.Tour = {
     -- 447 = careful driving that keeps to main roads and highways. (786603, the
     -- shuttle style, also has "shortest path" on, which cuts through side streets.)
     drivingStyle = 447,
-    snapRadius   = 10.0,            -- each point locks onto a lane going our way within this many metres
+
+    -- The driver goes GPS-style from point to point (GTA steers, so it keeps to the road and its lanes).
+    -- A long recording is thinned out first: every point in a turn is kept, on straight road only
+    -- one every maxGap metres. Your saved points are not changed.
+    thin = {
+        enabled  = true,
+        maxGap   = 60.0,            -- on straights keep one point about every this many metres
+        turnAt   = 6.0,             -- a point where the road bends this many degrees or more is always kept
+        keepBend = 12.0,            -- on long gentle curves keep one each time it has turned this much
+    },
+    turnSlow = {                    -- slow down before sharp turns so it doesn't swing wide
+        enabled  = true,
+        angle    = 40.0,            -- a turn sharper than this many degrees...
+        distance = 50.0,            -- ...coming up within this many metres...
+        speed    = 8.0,             -- ...drops it to this speed (m/s, ~18 mph) until it's through
+    },
+    snapRadius   = 30.0,            -- each point locks onto a lane going our way within this many metres
     viaRadius    = 40.0,            -- how close counts as "reached" for loop points (driving past one also counts)
     lookahead    = 1,               -- the driver aims this many points past the next one (smoother, no braking at points)
     arriveRadius = 15.0,            -- drop-off

@@ -169,8 +169,8 @@ end
 --  * reached(k, pos): close enough, or already driven past it (so a point
 --    missed by a lane never makes the car turn back). Height is checked so a
 --    bridge above / road below doesn't count.
-local function makeRoute()
-    local W = TC.waypoints
+local function makeRoute(W)
+    W = W or TC.waypoints
     local last = #W
     local cache = {}
 
@@ -190,9 +190,7 @@ local function makeRoute()
             local want = LF.HeadingOf(dir)
             for n = 1, 8 do
                 local found, node, heading = GetNthClosestVehicleNodeWithHeading(p.x, p.y, p.z, n, 0, 3.0, 0.0)
-                -- only the road the point is actually on: further out it can grab a ramp or the
-                -- main lanes running right next to it, and the car follows the wrong one
-                if not found or #(node - p) > (TC.snapRadius or 10.0) then break end
+                if not found or #(node - p) > (TC.snapRadius or 30.0) then break end
                 if math.abs(LF.AngleDiff(heading, want)) < 60.0 and math.abs(node.z - p.z) < 6.0 then
                     best = node
                     break
@@ -239,7 +237,23 @@ local function makeRoute()
         return k
     end
 
-    return { last = last, point = point, reached = reached, aim = aim }
+    -- a sharp turn coming up: the route turns more than `angle` degrees in total
+    -- over the next few points within `dist` metres of the car (a city corner
+    -- is usually spread over 2-3 recorded points). It slows down before it
+    -- instead of swinging wide.
+    local function turnAhead(wp, pos, angle, dist)
+        local total = 0.0
+        for k = math.max(2, wp - 1), math.min(last - 1, wp + 4) do
+            local a, b, c = W[k - 1], W[k], W[k + 1]
+            if #(vector3(b.x - pos.x, b.y - pos.y, 0.0)) < dist then
+                total = total + math.abs(LF.AngleDiff(LF.HeadingOf(vector3(b.x - a.x, b.y - a.y, 0.0)),
+                    LF.HeadingOf(vector3(c.x - b.x, c.y - b.y, 0.0))))
+            end
+        end
+        return total > angle
+    end
+
+    return { last = last, point = point, reached = reached, aim = aim, turnAhead = turnAhead }
 end
 
 -- On straight stretches the driver aims past the next point (no braking at
@@ -265,6 +279,33 @@ local function onHighway(pos)
     return false
 end
 
+-- Fewer points on straight road: every point in a turn is kept, on the
+-- straights only one every maxGap metres. The saved points aren't changed -
+-- every client thins them the same way, so point numbers match for handover.
+local thinRoute, thinKey
+local function thinned()
+    if thinRoute and thinKey == LF.LayoutVersion then return thinRoute end
+    local W, T2 = TC.waypoints, TC.thin or {}
+    if T2.enabled == false then return W end
+    local maxGap, keepBend, turnAt = T2.maxGap or 60.0, T2.keepBend or 12.0, T2.turnAt or 6.0
+    local out = { W[1] }
+    local lastKept, turned = W[1], 0.0
+    for k = 2, #W - 1 do
+        local a, b, c = W[k - 1], W[k], W[k + 1]
+        local bend = math.abs(LF.AngleDiff(LF.HeadingOf(vector3(b.x - a.x, b.y - a.y, 0.0)), LF.HeadingOf(vector3(c.x - b.x, c.y - b.y, 0.0))))
+        turned = turned + bend
+        local gap = #(vector3(b.x - lastKept.x, b.y - lastKept.y, 0.0))
+        if bend >= turnAt or turned >= keepBend or gap >= maxGap then
+            out[#out + 1] = b
+            lastKept, turned = b, 0.0
+        end
+    end
+    if #W > 1 then out[#out + 1] = W[#W] end
+    LF.Debug(('Highway drive: %d recorded points -> %d used'):format(#W, #out))
+    thinRoute, thinKey = out, LF.LayoutVersion
+    return out
+end
+
 local function drive(t, i)
     local c = t.cars[i]
     if c.driving then return end
@@ -278,7 +319,7 @@ local function drive(t, i)
     SetBlockingOfNonTemporaryEvents(ped, true)
     SetDriverAbility(ped, 1.0)
     SetDriverAggressiveness(ped, 0.0)
-    local route = makeRoute()
+    local route = makeRoute(thinned())
     -- city speed until we're on the highway (two checks in a row, so an
     -- overpass or a side street under a bridge doesn't flip it back and forth)
     local fast = TC.citySpeed == nil or onHighway(GetEntityCoords(veh))
@@ -308,10 +349,18 @@ local function drive(t, i)
             if onHighway(pos) ~= fast then streak = streak + 1 else streak = 0 end
             if streak >= 2 then
                 fast, streak = not fast, 0
-                curSpeed = fast and TC.speed or TC.citySpeed
-                SetDriveTaskCruiseSpeed(ped, curSpeed)
-                LF.Debug(('Highway drive: %s (%.0f mph)'):format(fast and 'highway speed' or 'city speed', curSpeed * 2.237))
+                LF.Debug(('Highway drive: %s'):format(fast and 'highway speed' or 'city speed'))
             end
+        end
+        -- city / highway speed, and slower into a sharp turn so it doesn't swing wide
+        local want = fast and TC.speed or TC.citySpeed
+        local TS = TC.turnSlow or {}
+        if TS.enabled ~= false and route.turnAhead(c.wp, pos, TS.angle or 40.0, TS.distance or 50.0) then
+            want = math.min(want, TS.speed or 8.0)
+        end
+        if want ~= curSpeed then
+            curSpeed = want
+            SetDriveTaskCruiseSpeed(ped, curSpeed)
         end
 
         if route.reached(c.wp, pos) then
