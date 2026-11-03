@@ -190,7 +190,9 @@ local function makeRoute()
             local want = LF.HeadingOf(dir)
             for n = 1, 8 do
                 local found, node, heading = GetNthClosestVehicleNodeWithHeading(p.x, p.y, p.z, n, 0, 3.0, 0.0)
-                if not found or #(node - p) > 30.0 then break end
+                -- only the road the point is actually on: further out it can grab a ramp or the
+                -- main lanes running right next to it, and the car follows the wrong one
+                if not found or #(node - p) > (TC.snapRadius or 10.0) then break end
                 if math.abs(LF.AngleDiff(heading, want)) < 60.0 and math.abs(node.z - p.z) < 6.0 then
                     best = node
                     break
@@ -557,7 +559,7 @@ local function riderLoop(t)
             if inCar and t.car ~= inCar then
                 -- got in (or swapped to another car in the line): buckle up again
                 t.car, t.buckling, t.promptShown = inCar, true, true
-                LFC.Nui('buckle', { show = true, key = Config.Keys.seatbelt })
+                LFC.Nui('buckle', { show = true, key = Config.Keys.seatbelt, scroll = TC.music ~= nil })
                 TriggerServerEvent('lastflight:server:tourSeated', t.id, inCar)
             elseif not inCar and t.car then
                 hideBuckle()

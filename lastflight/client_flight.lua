@@ -295,9 +295,9 @@ RegisterNetEvent('lastflight:client:seatbelt', function(flightId, requireBuckle)
     LFC.Nui('seatbelt', { on = true })
     if requireBuckle then
         F.buckling = true
-        LFC.Nui('buckle', { show = true, key = Config.Keys.seatbelt })
+        LFC.Nui('buckle', { show = true, key = Config.Keys.seatbelt, scroll = true })
     else
-        LFC.Nui('buckle', { show = true, key = Config.Keys.seatbelt, info = true })
+        LFC.Nui('buckle', { show = true, key = Config.Keys.seatbelt, info = true, scroll = true })
         SetTimeout(4000, function() LFC.Nui('buckle', { show = false }) end)
     end
 end)
@@ -498,13 +498,46 @@ function LFC.ProtectJet(veh)
         if SetPlaneEngineHealth then SetPlaneEngineHealth(veh, 1000.0) end
         StopEntityFire(veh)
     end
-    local want = Config.Aircraft.livery
-    if want and GetVehicleLivery(veh) ~= want then SetVehicleLivery(veh, want) end
+    local want = GlobalState.lf_livery
+    if want then
+        local cur, count, kind = LFC.JetLivery(veh)
+        if cur ~= want and want < count then
+            if kind == 'mod' then
+                SetVehicleModKit(veh, 0)
+                SetVehicleMod(veh, 48, want, false)
+            else
+                SetVehicleLivery(veh, want)
+            end
+        end
+    end
     if not liveryLogged then
         liveryLogged = true
-        LF.Debug(('Jet livery %d of %d (set Config.Aircraft.livery to lock one)'):format(GetVehicleLivery(veh), GetVehicleLiveryCount(veh)))
+        local cur, count = LFC.JetLivery(veh)
+        LF.Debug(('Jet livery %d of %d (lock one with /lastflight livery <number>)'):format(cur, count))
     end
 end
+
+-- The jet's paint job: some models use plain liveries, others the mod kit (slot 48).
+-- Returns current, count, 'livery' | 'mod'
+function LFC.JetLivery(veh)
+    local count = GetVehicleLiveryCount(veh)
+    if count and count > 0 then return GetVehicleLivery(veh), count, 'livery' end
+    SetVehicleModKit(veh, 0)
+    return GetVehicleMod(veh, 48), GetNumVehicleMods(veh, 48), 'mod'
+end
+
+-- /lastflight livery (no number): what the parked jet has now
+RegisterNetEvent('lastflight:client:liveryInfo', function()
+    local gs = GlobalState.lastflight
+    local veh = gs and gs.netId and NetworkDoesNetworkIdExist(gs.netId) and NetToVeh(gs.netId) or 0
+    if veh == 0 then
+        return LFC.Notify('No jet out right now. Spawn one with /' .. Config.Admin.command .. ' spawn and stand near it.', 'error')
+    end
+    local cur, count = LFC.JetLivery(veh)
+    local locked = GlobalState.lf_livery
+    LFC.Notify(('Jet livery %d (numbers 0 to %d). %s'):format(cur, math.max(0, count - 1),
+        locked and ('Locked to ' .. locked .. '.') or 'Not locked: GTA picks one each spawn.'), 'info')
+end)
 
 local function protect(veh)
     LFC.ProtectJet(veh)
@@ -533,6 +566,11 @@ CreateThread(function()
                 if GetGameTimer() - lastProtect > 2000 then
                     lastProtect = GetGameTimer()
                     protect(veh)
+                    -- once the music plays the engines go quiet (the flight is scripted, so
+                    -- they don't move the jet - it flies exactly the same)
+                    if Config.Music.quietEngines ~= false and F.musicStarted then
+                        SetVehicleEngineOn(veh, false, true, true)
+                    end
                     if F.isController and IsEntityDead(veh) then
                         TriggerServerEvent('lastflight:server:aircraftDestroyed', F.flightId)
                     end

@@ -13,7 +13,7 @@ local function reply(src, msg)
     end
 end
 
-local help = 'setup | logbook [id] | spawn | status | reset | cancel [refund|requeue] | depart | debug | mode <test|return|kick> | clearhistory <id|all> | coords | record <start|add|print|stop>'
+local help = 'setup | logbook [id] | spawn | status | reset | cancel [refund|requeue] | depart | debug | mode <test|return|kick> | livery [number|random] | clearhistory <id|all> | coords | record <start|add|print|stop>'
 
 RegisterCommand(Config.Admin.command, function(src, args)
     local sub = (args[1] or 'status'):lower()
@@ -62,6 +62,16 @@ RegisterCommand(Config.Admin.command, function(src, args)
             return reply(src, 'Current: ' .. LF.Modes[LF.Mode()].label .. '. Usage: /' .. Config.Admin.command .. ' mode test | return | kick')
         end
         LFS.SetMode(src, map[a])   -- saved on the server, survives restarts
+
+    elseif sub == 'livery' then
+        -- /lastflight livery          -> shows the parked jet's livery and how many it has
+        -- /lastflight livery 2        -> lock it (try numbers while looking at the jet)
+        -- /lastflight livery random   -> let GTA pick again
+        if not args[2] then
+            if src == 0 then return reply(src, 'Run it in game to see the jet, or: lastflight livery <number | random>') end
+            return TriggerClientEvent('lastflight:client:liveryInfo', src)
+        end
+        LFS.SetLivery(src, args[2]:lower())
 
     elseif sub == 'clearhistory' then
         if not args[2] then return reply(src, 'Usage: /' .. Config.Admin.command .. ' clearhistory <server id | identifier | all>') end

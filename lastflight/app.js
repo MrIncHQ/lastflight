@@ -312,6 +312,7 @@
             $('b-key').textContent = d.key || cfg.keys.seatbelt || 'B';
             $('b-title').textContent = 'FASTEN YOUR SEATBELT';
             $('b-count').textContent = '';
+            $('b-scroll').classList.toggle('hidden', !d.scroll);   // only where music plays
             show('buckle');
         }
         if (d.done) {

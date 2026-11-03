@@ -98,6 +98,32 @@ function LFS.SetRunLights(src, on)
         or 'The taxi and highway drive now stop at red lights.', 'success')
 end
 
+---------------------------------------------------------------------------
+-- Jet paint job (livery). GTA picks one at random when the jet spawns; an
+-- admin can lock one with /lastflight livery <number>. Saved on the server.
+---------------------------------------------------------------------------
+local LIVERY_KVP = 'livery'
+do
+    local v = tonumber(GetResourceKvpString(LIVERY_KVP) or '')
+    if v == nil then v = tonumber(Config.Aircraft.livery) end
+    GlobalState.lf_livery = v
+end
+
+function LFS.SetLivery(src, value)
+    if not allowed(src) then return reply(src, 'No permission.', 'error') end
+    if value == 'random' or value == 'off' then
+        DeleteResourceKvp(LIVERY_KVP)
+        GlobalState.lf_livery = nil
+        return reply(src, 'Jet livery unlocked: GTA picks one each time it spawns.', 'success')
+    end
+    local n = tonumber(value)
+    if not n or n < 0 or n > 50 then return reply(src, 'Usage: /' .. Config.Admin.command .. ' livery <number | random>', 'error') end
+    n = math.floor(n)
+    SetResourceKvp(LIVERY_KVP, tostring(n))
+    GlobalState.lf_livery = n
+    reply(src, ('Jet livery locked to %d. The parked jet changes within a few seconds.'):format(n), 'success')
+end
+
 RegisterNetEvent('lastflight:server:setRunLights', function(on)
     LFS.SetRunLights(source, on == true)
 end)

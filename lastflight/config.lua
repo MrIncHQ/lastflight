@@ -418,6 +418,7 @@ Config.Tour = {
     -- 447 = careful driving that keeps to main roads and highways. (786603, the
     -- shuttle style, also has "shortest path" on, which cuts through side streets.)
     drivingStyle = 447,
+    snapRadius   = 10.0,            -- each point locks onto a lane going our way within this many metres
     viaRadius    = 40.0,            -- how close counts as "reached" for loop points (driving past one also counts)
     lookahead    = 1,               -- the driver aims this many points past the next one (smoother, no braking at points)
     arriveRadius = 15.0,            -- drop-off
@@ -485,8 +486,8 @@ Config.Tour = {
 ---------------------------------------------------------------------------
 Config.Aircraft = {
     model       = 'jet',
-    livery      = nil,              -- nil = the model's own paint job. A number locks one (turn on /lastflight debug
-                                    -- and the F8 console shows "Jet livery X of Y" when the jet spawns)
+    livery      = nil,              -- nil = GTA picks a paint job each spawn. Easier: stand by the jet and use
+                                    -- /lastflight livery 0, 1, 2... to try them live; the last one is saved
     pilotModel  = 's_m_m_pilot_01',
     spawnPilot  = true,
     spawnOnStart = false,           -- false: the jet spawns when the first ticket is sold (no idle entity)
@@ -641,6 +642,7 @@ Config.Music = {
     -- last exactly as long as all tracks together, so the last song ends as the
     -- screen fades. This overrides ScenicFlight.duration.
     fitFlightToMusic = true,
+    quietEngines = true,    -- switch the jet's loud engine sound off once the music starts
 }
 
 ---------------------------------------------------------------------------

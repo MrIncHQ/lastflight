@@ -52,6 +52,8 @@ Any server admin can set it up. Being an admin in the **txAdmin** web panel is n
 4. To move a location, stand where you want it and click **Set here**. For routes, click **Record**, drive the path and press **F6** at each point. Press **F7** to bring the panel back.
 5. Click **Save as default**.
 
+**Jet paint job:** GTA picks one at random. To keep one, stand by the parked jet and type `/lastflight livery 0`, then `1`, `2` and so on until you like it. The last one is kept. `/lastflight livery random` lets GTA pick again.
+
 **Highway drive:** the Legion Square driver also offers a farewell drive around the island (press **G** at the NPC). To change its loop, open the **Highway drive** section, click **Clear** on the loop, then **Record** with **Auto** on and drive the highways once. Save when you're back.
 
 ## 6. Highway drive pop-ups

@@ -184,6 +184,15 @@ kbd {
 #buckle.done b { color: #3ddc84; }
 #buckle.done svg, #buckle.done .belt { fill: #3ddc84; stroke: #3ddc84; }
 #buckle.done .b-press { display: none; }
+/* "scroll = music volume" hint: small mouse with up / down arrows */
+#buckle .b-scroll {
+    display: flex; align-items: center; gap: 7px; margin-top: 4px;
+    font-size: 0.72rem; color: rgba(255,255,255,0.75);
+}
+#buckle .b-scroll svg, #buckle.done .b-scroll svg { width: 14px; height: 19px; fill: none; flex: none; }
+#buckle .b-scroll .mouse { fill: none; stroke: #fff; stroke-width: 1.8; }
+#buckle .b-scroll .wheel { stroke: var(--pink); stroke-width: 2.4; stroke-linecap: round; }
+#buckle .b-scroll .arrow { fill: var(--teal); stroke: none; }
 
 /* ---------- Flight HUD ---------- */
 #hud {
