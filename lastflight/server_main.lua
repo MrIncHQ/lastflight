@@ -1113,6 +1113,31 @@ RegisterNetEvent('lastflight:server:rideBlink', function(id)
     end
 end)
 
+-- After a drop-off: give riders a moment to get out, then the driver pulls
+-- away and the vehicle is removed once it's down the road (not in front of
+-- everyone). `driver` is the player whose game drives it away.
+-- Used by the shuttles here and the highway drive (server_tour.lua).
+function LFS.DriveAway(vehNet, pedNet, riders, driver, done)
+    local DA = Config.Transport.driveAway or {}
+    if DA.enabled == false then
+        return SetTimeout((DA.fallbackDelay or 6) * 1000, done)
+    end
+    SetTimeout((DA.after or 4) * 1000, function()
+        if not driver or not GetPlayerName(driver) then
+            driver = nil
+            for _, src in ipairs(riders) do
+                if GetPlayerName(src) then driver = src break end
+            end
+        end
+        for _, src in ipairs(riders) do
+            if GetPlayerName(src) then
+                TriggerClientEvent('lastflight:client:driveAway', src, vehNet, pedNet, src == driver)
+            end
+        end
+        SetTimeout((DA.time or 10) * 1000, done)
+    end)
+end
+
 RegisterNetEvent('lastflight:server:rideArrived', function(id)
     local ride = Rides[id]
     if not ride or ride.controller ~= source or ride.state ~= 'driving' then return end
@@ -1123,7 +1148,9 @@ RegisterNetEvent('lastflight:server:rideArrived', function(id)
         gateWalkUntil = now() + (Config.Transport.shuttle.walkGrace or 45) * 1000
     end
     rideEvent(ride, 'lastflight:client:rideExit')
-    SetTimeout((rideCfg(ride.kind).despawnDelay or 6) * 1000, function()
+    local riders = {}
+    for src in pairs(ride.riders) do riders[#riders + 1] = src end
+    LFS.DriveAway(ride.veh, ride.ped, riders, ride.controller, function()
         endRide(ride, 'arrived')
     end)
 end)

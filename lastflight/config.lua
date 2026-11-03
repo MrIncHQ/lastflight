@@ -132,6 +132,18 @@ Config.Airport = {
 ---------------------------------------------------------------------------
 Config.Transport = {
     driveYourself = true,      -- GPS route to the boarding point
+    runRedLights  = false,     -- city taxi + highway drive go through red lights. Only the first default:
+                               -- after that it's switched in game (/lastflight setup) and remembered
+
+    -- At every drop-off (city taxi, gate shuttle, highway drive) the driver pulls away and the
+    -- vehicle disappears once it's down the road, instead of vanishing in front of everyone.
+    driveAway = {
+        enabled      = true,
+        after        = 4,       -- seconds riders get to climb out first
+        time         = 10,      -- seconds it drives off before it's removed
+        speed        = 10.0,    -- m/s (~22 mph)
+        drivingStyle = 447,
+    },
 
     -- CITY PICKUP: an NPC in the city (default Legion Square). Players talk to
     -- them and an AI taxi drives them to the airport check-in desk.
@@ -160,7 +172,6 @@ Config.Transport = {
                                     -- it backs up at 1.5x and only fades/teleports at 2x this
         maxStuckRecoveries = 5,     -- after this many teleports the passenger is faded to the drop-off
         abandonTime        = 20,
-        despawnDelay       = 6,
         requireTicket      = false, -- true = only ticket holders can ride (tickets are sold at the airport)
         respawnAfter       = 20,    -- a NEW bus can be called once the previous one has been driving this many
                                     -- seconds (it is well clear of the stop by then, so they never stack)
@@ -184,7 +195,6 @@ Config.Transport = {
         arriveRadius       = 10.0,
         stuckTime          = 15,    -- seconds without moving 3 m before it re-routes (teleport only at 2x)
         maxStuckRecoveries = 3,     -- after this many, the passenger is faded and placed at the boarding point
-        despawnDelay       = 6,     -- seconds after drop-off before the shuttle is removed
         buckleTimeout      = 45,    -- the bus leaves when every rider has buckled (B), or this many seconds after the first one did
         minWait            = 30,    -- the bus always waits at least this long at the curb so others can join
         joinGrace          = 15,    -- each new rider who asks gets at least this many seconds to get on
@@ -343,19 +353,24 @@ Config.Tour = {
         vec3(1079.74, 386.31, 82.15),
         vec3(857.17, 140.27, 71.48),
         vec3(759.68, -0.76, 62.01),
-        vec3(706.01, -94.89, 53.62),
-        vec3(639.04, -206.47, 43.44),
-        vec3(596.62, -258.87, 43.05),
-        vec3(538.86, -322.33, 42.51),
-        vec3(509.34, -392.20, 44.05),
-        vec3(505.89, -444.86, 44.90),
-        vec3(531.98, -530.19, 44.39),
-        vec3(582.07, -586.62, 41.97),
+        vec3(704.36, -111.26, 52.35),
+        vec3(664.62, -185.00, 45.35),
+        vec3(608.19, -274.94, 39.49),
+        vec3(555.23, -337.04, 34.17),
+        vec3(526.14, -376.13, 34.89),
+        vec3(497.67, -416.05, 36.81),
+        vec3(487.86, -465.17, 41.27),
+        vec3(503.00, -503.11, 44.37),
+        vec3(547.21, -567.24, 44.14),
+        vec3(620.41, -615.85, 38.55),
         vec3(674.41, -632.86, 35.16),
-        vec3(781.65, -669.23, 38.69),
-        vec3(878.54, -741.81, 40.64),
-        vec3(923.48, -787.28, 37.53),
-        vec3(956.38, -826.68, 34.02),
+        vec3(719.06, -647.03, 35.11),
+        vec3(773.79, -658.30, 37.93),
+        vec3(826.49, -685.62, 41.36),
+        vec3(871.28, -720.28, 41.45),
+        vec3(890.65, -738.89, 40.46),
+        vec3(922.95, -774.79, 38.18),
+        vec3(956.08, -818.03, 34.48),
         vec3(974.81, -853.16, 31.77),
         vec3(997.88, -903.34, 29.66),
         vec3(1027.00, -993.98, 28.98),
@@ -409,7 +424,6 @@ Config.Tour = {
     stagger      = 3,               -- seconds between convoy cars pulling away
     stuckTime          = 20,
     maxStuckRecoveries = 6,
-    despawnDelay       = 6,
     buckleTimeout      = 45,        -- leaves when everyone has buckled (B), or this long after the first one did
     minWait            = 20,        -- always waits at least this long at the curb
     joinGrace          = 15,        -- each new rider gets at least this many seconds to get in
@@ -471,6 +485,8 @@ Config.Tour = {
 ---------------------------------------------------------------------------
 Config.Aircraft = {
     model       = 'jet',
+    livery      = nil,              -- nil = the model's own paint job. A number locks one (turn on /lastflight debug
+                                    -- and the F8 console shows "Jet livery X of Y" when the jet spawns)
     pilotModel  = 's_m_m_pilot_01',
     spawnPilot  = true,
     spawnOnStart = false,           -- false: the jet spawns when the first ticket is sold (no idle entity)
@@ -513,8 +529,10 @@ Config.Aircraft = {
         vec3(-1644.20, -2773.66, 12.94),
         vec3(-1668.32, -2796.96, 12.94),
         vec3(-1689.70, -2834.15, 12.94),
-        vec3(-1676.20, -2909.93, 12.96),
-        vec3(-1661.37, -2946.42, 12.94),
+        vec3(-1713.19, -2875.04, 12.94),
+        vec3(-1726.65, -2898.78, 12.94),
+        vec3(-1719.39, -2922.20, 12.94),
+        vec3(-1689.17, -2940.15, 12.94),
     },
     holdPoint = vec4(-1625.03, -2976.81, 12.94, 240.0),
 

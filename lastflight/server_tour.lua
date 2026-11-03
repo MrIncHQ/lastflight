@@ -356,31 +356,39 @@ RegisterNetEvent('lastflight:server:tourBlink', function(id, idx)
     end
 end)
 
-local function finishCar(g, i, eventName, delay)
+-- driveAway: at the drop-off the chauffeur pulls away before the car is
+-- removed. Otherwise (rescue) it's removed straight away.
+local function finishCar(g, i, eventName, driveAway)
     local riders = carRiders(g, i)
     for _, rider in ipairs(riders) do TriggerClientEvent(eventName, rider, g.id, i) end
-    SetTimeout(delay, function()
+    local function done()
         if Tours[g.id] ~= g then return end
         removeCar(g.cars[i])
         for _, rider in ipairs(riders) do
             if g.seatOf[rider] == i then g.riders[rider], g.seatOf[rider], g.buckled[rider] = nil, nil, nil end
         end
         if liveCars(g) == 0 or count(g.riders) == 0 then endGroup(g, 'all cars done') end
-    end)
+    end
+    local c = g.cars[i]
+    if driveAway and LFS.DriveAway then
+        LFS.DriveAway(c.veh, c.ped, riders, c.controller, done)
+    else
+        SetTimeout(0, done)
+    end
 end
 
 RegisterNetEvent('lastflight:server:tourArrived', function(id, idx)
     local g, c, i = controllerOf(source, id, idx)
     if not c or c.arrived then return end
     c.arrived = true
-    finishCar(g, i, 'lastflight:client:tourExit', TC.despawnDelay * 1000)
+    finishCar(g, i, 'lastflight:client:tourExit', true)
 end)
 
 RegisterNetEvent('lastflight:server:tourFailed', function(id, idx)
     local g, c, i = controllerOf(source, id, idx)
     if not c or c.arrived then return end
     c.arrived = true
-    finishCar(g, i, 'lastflight:client:tourRescue', 0)
+    finishCar(g, i, 'lastflight:client:tourRescue', false)
 end)
 
 CreateThread(function()

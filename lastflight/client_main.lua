@@ -181,6 +181,42 @@ RegisterNUICallback('close', function(_, cb)
     cb(1)
 end)
 
+-- After a drop-off (shuttles and the highway drive): make sure I'm out, and if
+-- it's my game driving, the driver pulls away. The server removes the vehicle
+-- a few seconds later, once it's down the road.
+RegisterNetEvent('lastflight:client:driveAway', function(vehNet, pedNet, drive)
+    local veh = vehNet and NetworkDoesNetworkIdExist(vehNet) and NetToVeh(vehNet) or 0
+    if veh == 0 then return end
+    local me = PlayerPedId()
+    if GetVehiclePedIsIn(me, false) == veh then TaskLeaveVehicle(me, veh, 16) end   -- still inside: straight out
+    if not drive then return end
+    CreateThread(function()
+        local ped = pedNet and NetworkDoesNetworkIdExist(pedNet) and NetToPed(pedNet) or 0
+        if ped == 0 then return end
+        local deadline = GetGameTimer() + 2000
+        while GetGameTimer() < deadline and not (NetworkHasControlOfEntity(veh) and NetworkHasControlOfEntity(ped)) do
+            NetworkRequestControlOfEntity(veh)
+            NetworkRequestControlOfEntity(ped)
+            Wait(100)
+        end
+        -- wait until no player is left in a seat, so nobody gets carried off
+        deadline = GetGameTimer() + 3000
+        local function occupied()
+            for seat = 0, GetVehicleModelNumberOfSeats(GetEntityModel(veh)) - 2 do
+                local p = GetPedInVehicleSeat(veh, seat)
+                if p ~= 0 and IsPedAPlayer(p) then return true end
+            end
+            return false
+        end
+        while occupied() and GetGameTimer() < deadline do Wait(100) end
+        if occupied() then return end
+        SetVehicleDoorsShut(veh, false)
+        local DA = Config.Transport.driveAway or {}
+        TaskVehicleDriveWander(ped, veh, DA.speed or 10.0, LF.DriveStyle(DA.drivingStyle or 447))
+        SetPedKeepTask(ped, true)
+    end)
+end)
+
 -- ESC on the readiness panel: release the mouse but keep the panel visible.
 RegisterNUICallback('unfocus', function(_, cb)
     LFC.Focus(false)

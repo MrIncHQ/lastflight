@@ -247,7 +247,7 @@ local curSpeed = TC.speed
 local function taskTo(veh, ped, route, wp)
     local k = route.aim(wp)
     local p = route.point(k)
-    TaskVehicleDriveToCoordLongrange(ped, veh, p.x, p.y, p.z, curSpeed, TC.drivingStyle, k >= route.last and TC.arriveRadius or 20.0)
+    TaskVehicleDriveToCoordLongrange(ped, veh, p.x, p.y, p.z, curSpeed, LF.DriveStyle(TC.drivingStyle), k >= route.last and TC.arriveRadius or 20.0)
     SetPedKeepTask(ped, true)
     return k
 end

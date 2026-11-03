@@ -117,7 +117,9 @@ end
 
 local function taskTo(r, veh, ped, wp)
     local c = r.t.cfg
-    TaskVehicleDriveToCoordLongrange(ped, veh, wp.x, wp.y, wp.z, c.speed, c.drivingStyle, c.arriveRadius)
+    -- the city taxi follows the red-lights setting; the gate shuttle always stops
+    local style = r.kind == 'city' and LF.DriveStyle(c.drivingStyle) or c.drivingStyle
+    TaskVehicleDriveToCoordLongrange(ped, veh, wp.x, wp.y, wp.z, c.speed, style, c.arriveRadius)
     SetPedKeepTask(ped, true)
 end
 

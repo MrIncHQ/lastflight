@@ -229,6 +229,14 @@ function LF.HeadingOf(dir)
     return (math.deg(math.atan(-dir.x, dir.y)) + 360.0) % 360.0
 end
 
+-- A driving style with "stop at traffic lights" (128) taken out when the admin
+-- switched red lights to "drive through" in the setup panel.
+function LF.DriveStyle(style)
+    style = math.floor(tonumber(style) or 0)
+    if GlobalState.lf_runLights then return style & ~128 end
+    return style
+end
+
 function LF.AngleDiff(a, b)
     return (b - a + 540.0) % 360.0 - 180.0
 end

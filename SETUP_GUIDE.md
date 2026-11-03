@@ -48,6 +48,7 @@ Any server admin can set it up. Being an admin in the **txAdmin** web panel is n
    - **Test**: nobody is kicked; players return to Legion Square
    - **Live - Return**: the live event; players return to Legion Square
    - **Live - Kick**: the live event; players are disconnected at the end
+   Under it, **Red lights** picks whether the city taxi and the highway drive stop at red lights or drive through them. It's saved straight away.
 4. To move a location, stand where you want it and click **Set here**. For routes, click **Record**, drive the path and press **F6** at each point. Press **F7** to bring the panel back.
 5. Click **Save as default**.
 

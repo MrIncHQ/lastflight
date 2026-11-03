@@ -105,6 +105,7 @@ local function push()
         dirty = Setup.dirty, active = Setup.active, auto = Setup.auto, insert = Setup.insert, route = Setup.route,
         focused = Setup.focused, stats = stats(),
         mode = Setup.mode, modes = LF.Modes, modeOrder = LF.ModeOrder, returnTo = Setup.returnTo,
+        runLights = Setup.runLights,
         keys = { panel = Config.Admin.setupKey, point = Config.Admin.setupPointKey },
         spacing = Config.Admin.autoRecordSpacing,
     })
@@ -209,6 +210,7 @@ RegisterNetEvent('lastflight:client:setupOpen', function(data)
     Setup.defaults = copy(data.defaults)
     Setup.saved, Setup.busy, Setup.route = data.saved, data.busy, data.route
     Setup.mode, Setup.returnTo = data.mode, data.returnTo
+    Setup.runLights = data.runLights == true
     Setup.dirty, Setup.active, Setup.auto, Setup.insert = false, nil, false, false
     Setup.open = true
     LFC.Nui('hidePanels')
@@ -218,6 +220,11 @@ end)
 RegisterNetEvent('lastflight:client:setupMode', function(mode)
     Setup.mode = mode
     Config.Farewell.mode = mode
+    push()
+end)
+
+RegisterNetEvent('lastflight:client:setupLights', function(on)
+    Setup.runLights = on == true
     push()
 end)
 
@@ -328,6 +335,8 @@ RegisterNUICallback('setupAction', function(data, cb)
         TriggerServerEvent('lastflight:server:setupFactory')
     elseif a == 'mode' and LF.Modes[data.mode or ''] then
         TriggerServerEvent('lastflight:server:setMode', data.mode)
+    elseif a == 'lights' then
+        TriggerServerEvent('lastflight:server:setRunLights', data.mode == 'run')
     elseif a == 'export' then
         local text = toConfigText(Setup.draft)
         print(text)

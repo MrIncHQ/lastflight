@@ -75,6 +75,33 @@ RegisterNetEvent('lastflight:server:setMode', function(mode)
     LFS.SetMode(source, tostring(mode))
 end)
 
+---------------------------------------------------------------------------
+-- Red lights: do the city taxi and the highway drive stop at them or drive
+-- through? Saved on the server, shared with every client via GlobalState.
+---------------------------------------------------------------------------
+local LIGHTS_KVP = 'runlights'
+do
+    local v = GetResourceKvpString(LIGHTS_KVP)
+    if v == nil then v = Config.Transport.runRedLights and '1' or '0' end
+    GlobalState.lf_runLights = v == '1'
+end
+
+function LFS.SetRunLights(src, on)
+    if not allowed(src) then return reply(src, 'No permission.', 'error') end
+    on = on == true
+    SetResourceKvp(LIGHTS_KVP, on and '1' or '0')
+    GlobalState.lf_runLights = on
+    print(('^5[lastflight]^7 %s set red lights to: %s'):format(src == 0 and 'console' or (GetPlayerName(src) or src),
+        on and 'drive through' or 'stop'))
+    if src ~= 0 then TriggerClientEvent('lastflight:client:setupLights', src, on) end
+    reply(src, on and 'The taxi and highway drive now drive through red lights.'
+        or 'The taxi and highway drive now stop at red lights.', 'success')
+end
+
+RegisterNetEvent('lastflight:server:setRunLights', function(on)
+    LFS.SetRunLights(source, on == true)
+end)
+
 function LFS.OpenSetup(src)
     if not allowed(src) then return reply(src, 'No permission.', 'error') end
     TriggerClientEvent('lastflight:client:setupOpen', src, {
@@ -85,6 +112,7 @@ function LFS.OpenSetup(src)
         route    = routeSummary(),
         mode     = LF.Mode(),
         returnTo = Config.Farewell.returnTo,
+        runLights = GlobalState.lf_runLights == true,
     })
 end
 

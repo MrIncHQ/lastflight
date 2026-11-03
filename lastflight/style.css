@@ -306,6 +306,9 @@ kbd {
 .s-switch:hover { background: rgba(255,255,255,0.16); }
 .s-switch.on { background: #fff; color: #111; border-color: #fff; cursor: default; }
 #setup.collapsed .s-mode { display: none; }
+.s-mode.s-lights { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.18); }
+.s-mode.s-lights b { color: #ff6b6b; }
+.s-lights .s-mode-btns { grid-template-columns: repeat(2, 1fr); }
 .s-x { background: none; border: 0; color: #fff; font-size: 1.6rem; cursor: pointer; opacity: 0.6; }
 .s-x:hover { opacity: 1; }
 .s-body { flex: 1; overflow-y: auto; padding: 6px 16px 10px; }

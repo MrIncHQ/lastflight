@@ -382,6 +382,13 @@
         $('s-mode-btns').innerHTML = (s.modeOrder || []).map((m) =>
             `<button class="s-switch ${m === s.mode ? 'on' : ''}" data-action="mode" data-mode="${m}">${short[m] || m}</button>`).join('');
 
+        // red lights: city taxi + highway drive stop at them, or drive through
+        $('s-lights-desc').textContent = s.runLights
+            ? 'The city taxi and the highway drive go straight through red lights.'
+            : 'The city taxi and the highway drive stop at red lights.';
+        $('s-lights-btns').innerHTML = [['stop', 'Stop at red', !s.runLights], ['run', 'Drive through', !!s.runLights]]
+            .map(([v, label, on]) => `<button class="s-switch ${on ? 'on' : ''}" data-action="lights" data-mode="${v}">${label}</button>`).join('');
+
         const st = $('s-state');
         st.className = 's-state' + (s.dirty ? ' dirty' : s.saved ? ' saved' : '');
         st.textContent = s.dirty ? 'Unsaved changes' : s.saved ? 'Saved layout active' : 'Using config.lua';
@@ -442,7 +449,7 @@
             setTimeout(() => { delete b.dataset.armed; b.textContent = 'Factory reset'; }, 3000);
             return;
         }
-        if (action === 'mode' && b.classList.contains('on')) return;
+        if ((action === 'mode' || action === 'lights') && b.classList.contains('on')) return;
         post('setupAction', { action, field: b.dataset.field, mode: b.dataset.mode });
     });
 

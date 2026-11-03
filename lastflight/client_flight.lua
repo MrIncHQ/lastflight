@@ -474,10 +474,40 @@ table.insert(LFC.onCleanup, function()
     end
 end)
 
-local function protect(veh)
+-- Invincible only stops NEW damage, so knocks taken in the moment after it
+-- spawns (or scraping the runway) would stay - and a damaged jet engine keeps
+-- burning. Repair anything, turn engine / tank fires off, and ignore bumps.
+-- Also keeps the paint job set in Config.Aircraft.livery.
+local liveryLogged
+function LFC.ProtectJet(veh)
     SetEntityInvincible(veh, true)
+    SetEntityProofs(veh, true, true, true, true, true, true, true, true)   -- bullets, fire, explosions, collisions...
     SetVehicleCanBeVisiblyDamaged(veh, false)
     SetVehicleExplodesOnHighExplosionDamage(veh, false)
+    SetVehicleCanBreak(veh, false)
+    if SetDisableVehicleEngineFires then SetDisableVehicleEngineFires(veh, true) end
+    if SetDisableVehiclePetrolTankFires then SetDisableVehiclePetrolTankFires(veh, true) end
+    SetVehicleEngineCanDegrade(veh, false)
+    if GetVehicleEngineHealth(veh) < 999.0 or GetVehicleBodyHealth(veh) < 999.0 or GetVehiclePetrolTankHealth(veh) < 999.0 then
+        LF.Debug(('Repairing the jet (engine %.0f, body %.0f)'):format(GetVehicleEngineHealth(veh), GetVehicleBodyHealth(veh)))
+        SetVehicleFixed(veh)
+        SetVehicleDeformationFixed(veh)
+        SetVehicleEngineHealth(veh, 1000.0)
+        SetVehicleBodyHealth(veh, 1000.0)
+        SetVehiclePetrolTankHealth(veh, 1000.0)
+        if SetPlaneEngineHealth then SetPlaneEngineHealth(veh, 1000.0) end
+        StopEntityFire(veh)
+    end
+    local want = Config.Aircraft.livery
+    if want and GetVehicleLivery(veh) ~= want then SetVehicleLivery(veh, want) end
+    if not liveryLogged then
+        liveryLogged = true
+        LF.Debug(('Jet livery %d of %d (set Config.Aircraft.livery to lock one)'):format(GetVehicleLivery(veh), GetVehicleLiveryCount(veh)))
+    end
+end
+
+local function protect(veh)
+    LFC.ProtectJet(veh)
     SetVehicleDoorsLocked(veh, 2)
     local pilot = GetPedInVehicleSeat(veh, -1)
     if pilot ~= 0 and not IsPedAPlayer(pilot) and NetworkHasControlOfEntity(pilot) then
@@ -649,7 +679,7 @@ CreateThread(function()
                     if LFC.SettleParkedJet(veh) then settled = veh end
                 end
                 FreezeEntityPosition(veh, true)
-                SetEntityInvincible(veh, true)
+                LFC.ProtectJet(veh)
                 SetVehicleDoorsLocked(veh, 2)
             else
                 settled = nil
