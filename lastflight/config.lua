@@ -428,6 +428,7 @@ Config.Tour = {
         turnAt   = 6.0,             -- a point where the road bends this many degrees or more is always kept
         keepBend = 12.0,            -- on long gentle curves keep one each time it has turned this much
         keepAfterTurn = 40.0,       -- every point up to this far after a turn is kept (its exit)
+        minGap   = 5.0,             -- points closer than this to the previous one are ignored (bunched F6 presses)
     },
     turnSlow = {                    -- slow down before sharp turns so it doesn't swing wide
         enabled  = true,
@@ -441,12 +442,59 @@ Config.Tour = {
         bend    = 25.0,             -- ...sharper than this many degrees at one point...
         past    = 20.0,             -- ...makes it aim at a point this many metres past the end of the turn
     },
+    -- Slow zones: tricky spots where the car should ease off, e.g. where lanes split, so a lane
+    -- change there is gentle instead of a swerve at highway speed. pos = centre, radius in metres,
+    -- speed in m/s (13.4 = 30 mph). snap (optional, metres): inside the zone each point is locked onto
+    -- the road that leads on along the route - for spots where an exit runs right beside it and the
+    -- car keeps getting planned into the exit lanes.
+    slowZones = {
+        { pos = vec3(944.40, -810.70, 34.50), radius = 85.0, speed = 13.4, snap = 15.0 },   -- Olympic Fwy split, points 1123-1127
+    },
+
+    -- Roads the driver keeps taking by mistake (a ramp, a bridge...). Each is a box from `from` to `to`,
+    -- `width` metres wide and `height` metres above / below. They're switched off only on the game
+    -- driving the farewell car, only during the drive. Keep each box on the wrong road only: well
+    -- clear of the route (stand on the road and use /lastflight coords to get positions).
+    blockRoads = {
+        {   -- exit ramp beside the route around point 1132 (car kept moving over onto it)
+            from = vec3(981.65, -888.42, 31.13), to = vec3(996.69, -936.11, 31.13),
+            width = 8.0, height = 6.0,
+        },
+        {   -- side road heading north-west off the route around points 78-85 (car detoured onto it,
+            -- then U-turned back)
+            from = vec3(-836.11, -638.01, 27.79), to = vec3(-866.85, -612.41, 27.79),
+            width = 6.0, height = 4.0,
+        },
+        {   -- bridge crossing ~14 m above the route just before it (height kept small so the
+            -- route underneath stays open)
+            from = vec3(953.54, -843.38, 46.49), to = vec3(1013.46, -846.52, 46.49),
+            width = 10.0, height = 4.0,
+        },
+        -- turns and ramps along the loop the car must not take (added 2026-11-10)
+        { from = vec3(2043.34, 2617.69, 53.05), to = vec3(2014.10, 2590.40, 53.05), width = 6.0, height = 4.0 },
+        { from = vec3(2797.61, 4405.54, 48.57), to = vec3(2836.74, 4413.82, 48.57), width = 6.0, height = 4.0 },
+        { from = vec3(2630.43, 5109.94, 44.35), to = vec3(2668.85, 5121.09, 44.35), width = 6.0, height = 4.0 },
+        { from = vec3(-1689.03, -507.82, 37.31), to = vec3(-1662.36, -478.01, 37.31), width = 6.0, height = 4.0 },
+        { from = vec3(-1726.54, -515.32, 37.49), to = vec3(-1755.71, -487.95, 37.49), width = 6.0, height = 4.0 },
+        { from = vec3(-2147.68, -300.89, 12.54), to = vec3(-2139.71, -261.69, 12.54), width = 6.0, height = 4.0 },
+        { from = vec3(612.47, -239.18, 43.69), to = vec3(584.94, -268.20, 43.69), width = 6.0, height = 4.0 },
+        { from = vec3(537.08, -382.34, 32.55), to = vec3(511.88, -413.40, 32.55), width = 6.0, height = 4.0 },
+        { from = vec3(481.75, -415.10, 37.80), to = vec3(450.91, -440.57, 37.80), width = 6.0, height = 4.0 },
+        { from = vec3(895.36, -776.97, 41.50), to = vec3(924.31, -804.57, 41.50), width = 6.0, height = 4.0 },
+        { from = vec3(1049.38, -1658.91, 30.30), to = vec3(1057.28, -1698.12, 30.30), width = 6.0, height = 4.0 },
+        { from = vec3(-714.12, -1883.16, 26.90), to = vec3(-691.13, -1915.89, 26.90), width = 6.0, height = 4.0 },
+        { from = vec3(-684.33, -2021.98, 25.73), to = vec3(-662.03, -2055.18, 25.73), width = 6.0, height = 4.0 },
+        { from = vec3(-835.74, -2256.60, 16.49), to = vec3(-859.93, -2288.46, 16.49), width = 6.0, height = 4.0 },
+    },
     splitLook    = 60.0,            -- where a ramp splits off: picks the lane that leads toward the route this far on
     snapRadius   = 0.0,             -- 0 = drive to your recorded points exactly (recommended for in-lane recordings).
                                     -- Above 0: move each point onto a road line going our way within this many metres.
                                     -- That helped rough, hand-placed points but can grab a cross street or a ramp.
     viaRadius    = 10.0,            -- a point counts as reached this close (points are ~20 m apart)
     passSide     = 10.0,            -- ...or once the car has driven past it within this many metres to the side
+    behindRange  = 30.0,            -- a point behind the car within this distance counts as passed (never turns back)
+    viaStop      = 3.0,             -- GTA's driver only stops this close to a point (keep well under viaRadius)
+    idleNudge    = 4,               -- standing still this many seconds (not at a red light): orders are given again
     lookahead    = 1,               -- the driver aims this many points past the next one (smoother, no braking at points)
     arriveRadius = 15.0,            -- drop-off
     stagger      = 3,               -- seconds between convoy cars pulling away
@@ -772,5 +820,6 @@ Config.Admin = {
     -- file until you press "Factory reset" in the editor.
     setupKey      = 'F7',   -- reopen the editor panel while moving around
     setupPointKey = 'F6',   -- add a point to the route you are recording
+    setupDeleteKey = 'F5',  -- delete the route point nearest you (without opening the panel)
     autoRecordSpacing = 15.0, -- metres between points when auto-record is on
 }

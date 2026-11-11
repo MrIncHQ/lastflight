@@ -56,6 +56,8 @@ Any server admin can set it up. Being an admin in the **txAdmin** web panel is n
 
 **Highway drive:** the Legion Square driver also offers a farewell drive around the island (press **G** at the NPC). To change its loop, open the **Highway drive** section, click **Clear** on the loop, then **Record** with **Auto** on and drive the highways once. Save when you're back.
 
+To test one part of the drive without doing the whole loop, stand by that part of the route and type `/lastflight drivetest`. A farewell car spawns on the nearest point and drives on from there.
+
 ## 6. Highway drive pop-ups
 
 During the highway drive, place names and short quotes pop up as the car passes. Change them in `lastflight/config.lua` under `Config.Tour.viewpoints`. Each pop-up is one line:

@@ -31,6 +31,34 @@ do
         local ok, data = pcall(json.decode, raw)
         local clean, err
         if ok then clean, err = LF.ValidateLayout(data) else err = 'corrupt JSON' end
+        -- One time only: put the blocked roads written in config.lua into the saved
+        -- layout (a bug once saved it with none). Duplicates are skipped, and after
+        -- this the setup panel is in charge - blocks deleted there stay deleted.
+        -- only counts as done once it has really seen the config.lua blocks (if the
+        -- server ran an older shared.lua first, it saw none and must try again)
+        local MERGED = 'blocksMerged2'
+        local fromConfig = #(LF.DefaultLayout.tourBlocks or {})
+        print(('^5[lastflight]^7 Blocked roads: %d in config.lua, %d in the saved locations'):format(fromConfig, #((clean and clean.tourBlocks) or {})))
+        if clean and fromConfig > 0 and not GetResourceKvpString(MERGED) then
+            local list, added = clean.tourBlocks or {}, 0
+            for _, nb in ipairs(LF.DefaultLayout.tourBlocks or {}) do
+                local dup = false
+                for _, b in ipairs(list) do
+                    if #(vector3(b.from.x - nb.from.x, b.from.y - nb.from.y, 0.0)) < 2.0
+                        and #(vector3(b.to.x - nb.to.x, b.to.y - nb.to.y, 0.0)) < 2.0 then dup = true break end
+                end
+                if not dup and #list < LF.LayoutFields.tourBlocks.max then
+                    list[#list + 1] = nb
+                    added = added + 1
+                end
+            end
+            clean.tourBlocks = list
+            if added > 0 then
+                SetResourceKvp(KVP, json.encode(clean))
+                print(('^5[lastflight]^7 Added %d blocked road(s) from config.lua to the saved locations'):format(added))
+            end
+            SetResourceKvp(MERGED, '1')
+        end
         if clean then
             LF.ApplyLayout(clean)
             publish(clean, true)

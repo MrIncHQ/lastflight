@@ -24,6 +24,8 @@ local FIELDS = {
       hint = 'The driver follows these points GPS-style. Clear it, then Record with Auto on (a point every 20 m) and drive the loop in the lane you want; add F6 points through tight turns. The purple line shows your recorded route.' },
     { key = 'tourDropoff',    group = 'Highway drive', kind = 'vec3', ground = true, label = 'Highway drive drop-off',
       hint = 'Where the farewell cars let players out at the end (by the check-in desk).' },
+    { key = 'tourBlocks',     group = 'Highway drive', kind = 'blocks', label = 'Blocked roads',
+      hint = 'Ramps / side roads the car keeps taking. Stand on the wrong road 10-20 m past where it splits off, facing away from the route, and click Add here. Red boxes show them. Move / Longer / Shorter / Delete act on the box nearest you.' },
 
     { key = 'npc',           group = 'Airport',  kind = 'vec4', label = 'Check-in desk agent',
       hint = 'Stand where the agent should stand, facing the customers.' },
@@ -106,7 +108,8 @@ local function push()
         focused = Setup.focused, stats = stats(),
         mode = Setup.mode, modes = LF.Modes, modeOrder = LF.ModeOrder, returnTo = Setup.returnTo,
         runLights = Setup.runLights,
-        keys = { panel = Config.Admin.setupKey, point = Config.Admin.setupPointKey },
+        keys = { panel = Config.Admin.setupKey, point = Config.Admin.setupPointKey, delete = Config.Admin.setupDeleteKey or 'F5' },
+        cmd = Config.Admin.command,
         spacing = Config.Admin.autoRecordSpacing,
     })
 end
@@ -188,6 +191,127 @@ local function deleteNearest(key)
     changed()
 end
 
+---------------------------------------------------------------------------
+-- Blocked roads (Highway drive): boxes over roads the driver must not take.
+-- A new box starts where you stand and runs the way you face, so stand on the
+-- wrong road facing away from the route. A box that would come too close to
+-- the recorded route is refused (it would close the car's own road).
+---------------------------------------------------------------------------
+local BLOCK_LEN, BLOCK_W, BLOCK_H = 40.0, 6.0, 4.0
+local BLOCK_MIN_GAP = 3.0
+
+local function flatDist(ax, ay, bx, by) return math.sqrt((ax - bx) ^ 2 + (ay - by) ^ 2) end
+
+-- distance from point p to the box's centre line (from -> to)
+local function toSegment(b, p)
+    local ux, uy = b.to.x - b.from.x, b.to.y - b.from.y
+    local len = math.sqrt(ux * ux + uy * uy)
+    if len < 0.1 then return flatDist(p.x, p.y, b.from.x, b.from.y) end
+    local along = math.max(0.0, math.min(len, ((p.x - b.from.x) * ux + (p.y - b.from.y) * uy) / len))
+    return flatDist(p.x, p.y, b.from.x + ux / len * along, b.from.y + uy / len * along)
+end
+
+-- how far the box's edge stays from the recorded highway route (same height only)
+local function blockGap(b)
+    local best = math.huge
+    for _, p in ipairs(Setup.draft.tourRoute or {}) do
+        if math.abs(p.z - b.from.z) <= (b.height or BLOCK_H) + 3.0 then
+            best = math.min(best, toSegment(b, p) - (b.width or BLOCK_W) / 2)
+        end
+    end
+    return best
+end
+
+-- a box starting where you are (in your car if you're in one), `len` m the way you face
+local function blockHere(len, width, height)
+    local ped = PlayerPedId()
+    local veh = GetVehiclePedIsIn(ped, false)
+    local ent = veh ~= 0 and veh or ped
+    local c, h = GetEntityCoords(ent), math.rad(GetEntityHeading(ent))
+    local found, gz = GetGroundZFor_3dCoord(c.x, c.y, c.z + 1.0, false)
+    local z = round(found and gz or (c.z - 1.0))
+    return {
+        from = { x = round(c.x), y = round(c.y), z = z },
+        to = { x = round(c.x - math.sin(h) * len), y = round(c.y + math.cos(h) * len), z = z },
+        width = width, height = height,
+    }
+end
+
+local function nearestBlock()
+    local me = GetEntityCoords(PlayerPedId())
+    local best, bestD
+    for i, b in ipairs(Setup.draft.tourBlocks or {}) do
+        local d = toSegment(b, me)
+        if not bestD or d < bestD then best, bestD = i, d end
+    end
+    if best and bestD > 200.0 then return nil end
+    return best, bestD
+end
+
+local function checkGap(b)
+    local gap = blockGap(b)
+    if gap < BLOCK_MIN_GAP then
+        LFC.Notify(('That box would come %.0f m from your route and could close the car\'s own road. Stand further onto the wrong road, facing away from the route.')
+            :format(math.max(0, gap)), 'error')
+        return false
+    end
+    return true, gap
+end
+
+local function blockAction(a)
+    local list = Setup.draft.tourBlocks
+    if a == 'blockImport' then
+        -- the blocks written in config.lua, added to the ones in the panel (duplicates skipped)
+        local added = 0
+        for _, nb in ipairs((Setup.defaults and Setup.defaults.tourBlocks) or {}) do
+            local dup = false
+            for _, b in ipairs(list) do
+                if flatDist(b.from.x, b.from.y, nb.from.x, nb.from.y) < 2.0 and flatDist(b.to.x, b.to.y, nb.to.x, nb.to.y) < 2.0 then dup = true break end
+            end
+            if not dup and #list < LF.LayoutFields.tourBlocks.max then
+                list[#list + 1] = { from = nb.from, to = nb.to, width = nb.width, height = nb.height }
+                added = added + 1
+            end
+        end
+        LFC.Notify(added > 0 and ('Added %d blocked road(s) from config.lua. Save to keep them.'):format(added)
+            or 'All the config.lua blocked roads are already in the list.', added > 0 and 'success' or 'info')
+        if added == 0 then return end
+    elseif a == 'blockAdd' then
+        if #list >= LF.LayoutFields.tourBlocks.max then return LFC.Notify('That\'s the most blocked roads allowed.', 'error') end
+        local b = blockHere(BLOCK_LEN, BLOCK_W, BLOCK_H)
+        local ok, gap = checkGap(b)
+        if not ok then return end
+        list[#list + 1] = b
+        LFC.Notify(('Blocked road %d added (%.0f m clear of your route). Save to keep it.'):format(#list, gap), 'success')
+    else
+        local i, d = nearestBlock()
+        if not i then return LFC.Notify('No blocked road within 200 m of you.', 'error') end
+        local o = list[i]
+        local len = flatDist(o.from.x, o.from.y, o.to.x, o.to.y)
+        if a == 'blockDel' then
+            table.remove(list, i)
+            LFC.Notify(('Removed blocked road %d (%.0f m from you).'):format(i, d), 'success')
+        elseif a == 'blockMove' then
+            local b = blockHere(len, o.width, o.height)
+            if not checkGap(b) then return end
+            list[i] = b
+            LFC.Notify(('Moved blocked road %d to where you are, facing your way.'):format(i), 'success')
+        elseif a == 'blockLonger' or a == 'blockShorter' then
+            local newLen = math.max(10.0, math.min(150.0, len + (a == 'blockLonger' and 10.0 or -10.0)))
+            local s = newLen / math.max(len, 0.1)
+            local b = {
+                from = o.from, width = o.width, height = o.height,
+                to = { x = round(o.from.x + (o.to.x - o.from.x) * s), y = round(o.from.y + (o.to.y - o.from.y) * s), z = o.to.z },
+            }
+            if a == 'blockLonger' and not checkGap(b) then return end
+            list[i] = b
+            LFC.Notify(('Blocked road %d is now %.0f m long.'):format(i, newLen), 'success')
+        end
+    end
+    PlaySoundFrontend(-1, 'SELECT', 'HUD_FRONTEND_DEFAULT_SOUNDSET', true)
+    changed()
+end
+
 local function close()
     Setup.open, Setup.active, Setup.auto, Setup.insert = false, nil, false, false
     LFC.Nui('setup', { show = false })
@@ -251,6 +375,13 @@ local function toConfigText(d)
     local via = list(d.shuttleRoute, '    ')
     local cityVia = list(d.cityRoute, '    ')
     local tourVia = list(d.tourRoute, '    ')
+    local function blocks(l)
+        local out = {}
+        for _, b in ipairs(l) do
+            out[#out + 1] = ('    { from = %s, to = %s, width = %.1f, height = %.1f },'):format(v3s(b.from), v3s(b.to), b.width or 6.0, b.height or 4.0)
+        end
+        return table.concat(out, '\n')
+    end
     return table.concat({
         '-- Paste these into config.lua (Last Flight setup export)',
         'Config.Transport.city.npc   = ' .. v4s(d.cityNpc),
@@ -261,6 +392,9 @@ local function toConfigText(d)
         'Config.Tour.spawn = ' .. v4s(d.tourSpawn),
         'Config.Tour.waypoints = {',
         tourVia .. (tourVia ~= '' and '\n' or '') .. '    ' .. v3s(d.tourDropoff) .. ',   -- drop-off',
+        '}',
+        'Config.Tour.blockRoads = {',
+        blocks(d.tourBlocks or {}),
         '}',
         'Config.Airport.npc.coords     = ' .. v4s(d.npc),
         'Config.Airport.blip.coords    = ' .. v3s(d.npc),
@@ -286,10 +420,12 @@ RegisterNUICallback('setupAction', function(data, cb)
     local a, key = data.action, data.field
     local f = key and FIELD[key]
 
-    if a == 'set' and f and f.kind ~= 'list' then
+    if a == 'blockImport' or a == 'blockAdd' or a == 'blockMove' or a == 'blockDel' or a == 'blockLonger' or a == 'blockShorter' then
+        blockAction(a)
+    elseif a == 'set' and f and f.kind ~= 'list' and f.kind ~= 'blocks' then
         Setup.draft[key] = capture(f)
         changed()
-    elseif a == 'go' and f then
+    elseif a == 'go' and f and f.kind ~= 'blocks' then
         local p = f.kind == 'list' and Setup.draft[key][tonumber(data.index) or #Setup.draft[key]] or Setup.draft[key]
         if p then
             setFocus(false)
@@ -361,6 +497,16 @@ RegisterCommand('lastflight_setup_point', function()
 end, false)
 RegisterKeyMapping('lastflight_setup_point', 'Last Flight: add route point (admin)', 'keyboard', Config.Admin.setupPointKey)
 
+-- delete the route point nearest you without opening the panel: the route you're
+-- recording / inserting into, otherwise the highway loop
+RegisterCommand('lastflight_setup_delete', function()
+    if not Setup.open or Setup.focused then return end
+    local key = (Setup.active and FIELD[Setup.active] and FIELD[Setup.active].kind == 'list') and Setup.active or 'tourRoute'
+    deleteNearest(key)
+    PlaySoundFrontend(-1, 'BACK', 'HUD_FRONTEND_DEFAULT_SOUNDSET', true)
+end, false)
+RegisterKeyMapping('lastflight_setup_delete', 'Last Flight: delete nearest route point (admin)', 'keyboard', Config.Admin.setupDeleteKey or 'F5')
+
 ---------------------------------------------------------------------------
 -- Auto-record + world preview
 ---------------------------------------------------------------------------
@@ -427,7 +573,7 @@ CreateThread(function()
             -- single points
             for _, f in ipairs(FIELDS) do
                 local p = d[f.key]
-                if f.kind ~= 'list' and near(p) then
+                if (f.kind == 'vec3' or f.kind == 'vec4') and near(p) then
                     marker(p, 255, 61, 139, f.label, f.kind == 'vec4' and f.key ~= 'holdPoint' and p.w or nil)
                 end
             end
@@ -442,16 +588,49 @@ CreateThread(function()
                 cprev = p
             end
 
-            -- highway drive: pickup -> loop -> drop-off (purple)
+            -- blocked roads (Config.Tour.blockRoads) as red boxes, so you can see they sit
+            -- on the wrong road only and never across the purple route
+            for _, b in ipairs(d.tourBlocks or {}) do
+                if near(b.from) or near(b.to) then
+                    local dx, dy = b.to.x - b.from.x, b.to.y - b.from.y
+                    local len = math.sqrt(dx * dx + dy * dy)
+                    if len > 0.1 then
+                        local hw = (b.width or 8.0) / 2
+                        local ox, oy = -dy / len * hw, dx / len * hw
+                        local z1, z2 = b.from.z + 0.4, b.to.z + 0.4
+                        local c1 = vector3(b.from.x + ox, b.from.y + oy, z1)
+                        local c2 = vector3(b.to.x + ox, b.to.y + oy, z2)
+                        local c3 = vector3(b.to.x - ox, b.to.y - oy, z2)
+                        local c4 = vector3(b.from.x - ox, b.from.y - oy, z1)
+                        DrawLine(c1.x, c1.y, c1.z, c2.x, c2.y, c2.z, 255, 40, 40, 255)
+                        DrawLine(c2.x, c2.y, c2.z, c3.x, c3.y, c3.z, 255, 40, 40, 255)
+                        DrawLine(c3.x, c3.y, c3.z, c4.x, c4.y, c4.z, 255, 40, 40, 255)
+                        DrawLine(c4.x, c4.y, c4.z, c1.x, c1.y, c1.z, 255, 40, 40, 255)
+                        DrawLine(c1.x, c1.y, c1.z, c3.x, c3.y, c3.z, 255, 40, 40, 160)
+                    end
+                end
+            end
+
+            -- highway drive: pickup -> loop -> drop-off (purple). GTA can only place 32
+            -- floating labels per frame, and a long loop has far more points nearby, so
+            -- only the closest ones get their number (the rest keep their circle)
             local tprev = d.tourSpawn
+            local labels = {}
             for i, p in ipairs(d.tourRoute) do
                 if near(p) or near(tprev) then
                     line(tprev, p, 170, 110, 255)
-                    marker(p, 170, 110, 255, ('Highway %d'):format(i))
+                    marker(p, 170, 110, 255)
+                    local dist = #(vec(p) - me)
+                    if dist < 150.0 then labels[#labels + 1] = { i = i, p = p, d = dist } end
                 end
                 tprev = p
             end
             if near(tprev) or near(d.tourDropoff) then line(tprev, d.tourDropoff, 170, 110, 255) end
+            table.sort(labels, function(x, y) return x.d < y.d end)
+            for n = 1, math.min(#labels, 20) do
+                local l = labels[n]
+                text3d(vector3(l.p.x, l.p.y, l.p.z + 1.4), ('Highway %d'):format(l.i))
+            end
 
             -- shuttle: pickup -> via -> drop-off (blue)
             local prev = d.shuttleSpawn
@@ -484,12 +663,14 @@ CreateThread(function()
             if not Setup.focused then
                 local msg
                 if Setup.active then
-                    msg =('%s ~y~%s~s~ - %d points%s~n~%s %s  |  %s open panel'):format(
+                    msg =('%s ~y~%s~s~ - %d points%s~n~%s %s  |  %s delete nearest  |  %s open panel'):format(
                         Setup.insert and 'Inserting into' or 'Recording',
                         FIELD[Setup.active].label, #d[Setup.active], Setup.auto and ' ~g~(auto)~s~' or '',
-                        Config.Admin.setupPointKey, Setup.insert and 'insert point here' or 'add point', Config.Admin.setupKey)
+                        Config.Admin.setupPointKey, Setup.insert and 'insert point here' or 'add point',
+                        Config.Admin.setupDeleteKey or 'F5', Config.Admin.setupKey)
                 else
-                    msg = ('Last Flight setup - %s open the panel~n~Use the logbook again to close'):format(Config.Admin.setupKey)
+                    msg = ('Last Flight setup - %s open the panel  |  %s delete nearest highway point~n~Use the logbook again to close')
+                        :format(Config.Admin.setupKey, Config.Admin.setupDeleteKey or 'F5')
                 end
                 LFC.HelpText(msg)
             end

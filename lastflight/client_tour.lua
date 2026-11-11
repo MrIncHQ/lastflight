@@ -200,6 +200,14 @@ local function makeRoute(W)
         -- the wrong road: a two-way street's node can point either way, so it may
         -- grab the cross street instead; next to a ramp it may grab the ramp.
         local snap = TC.snapRadius or 0.0
+        -- inside a slow zone with `snap` set (e.g. where an exit runs right beside the
+        -- route) lock the point onto the road that leads on along the route, so GTA
+        -- doesn't attach it to the exit and plan the car into the exit lanes
+        for _, z in ipairs(TC.slowZones or {}) do
+            if z.snap and #(vector3(p.x - z.pos.x, p.y - z.pos.y, 0.0)) < (z.radius or 60.0) then
+                snap = math.max(snap, z.snap)
+            end
+        end
         if snap > 0.0 and dir and k < last then
             local want = LF.HeadingOf(dir)
             local cands = {}
@@ -210,30 +218,33 @@ local function makeRoute(W)
                     cands[#cands + 1] = { node = node, heading = heading }
                 end
             end
-            if #cands == 1 then
-                best = cands[1].node
-            elseif #cands > 1 then
-                -- Two lanes going our way, e.g. where a ramp splits off the freeway: take
-                -- the one that leads toward the route further on. A ramp curves away from
-                -- it; the road we want keeps pointing at it.
+            if #cands > 0 then
+                -- Lanes going our way, e.g. where a ramp splits off the freeway: take the
+                -- one that leads toward the route further on. A ramp curves away from it;
+                -- the road we want keeps pointing at it. If none really does (only the
+                -- exit is close), keep the recorded point as it is.
                 local far = ahead(k, TC.splitLook or 60.0)
-                local bestScore
+                local pick, bestScore
                 for _, c in ipairs(cands) do
                     local toward = LF.HeadingOf(vector3(far.x - c.node.x, far.y - c.node.y, 0.0))
                     local score = math.abs(LF.AngleDiff(c.heading, toward))
-                    if not bestScore or score < bestScore - 5.0 then best, bestScore = c.node, score end
+                    if not bestScore or score < bestScore - 5.0 then pick, bestScore = c.node, score end
                 end
+                if pick and bestScore <= (TC.splitMaxAngle or 35.0) then best = pick end
             end
         end
         cache[k] = best
         return best
     end
 
-    local function reached(k, pos)
+    local function reached(k, pos, fwd)
         local p = point(k)
         if math.abs(pos.z - p.z) > 8.0 then return false end
         local flat = vector3(pos.x - p.x, pos.y - p.y, 0.0)
         if k >= last then return #flat < TC.arriveRadius end
+        -- behind the car (by the car's own facing) and close: it's done. The driver
+        -- is never sent back for a point - that was the detour + U-turn.
+        if fwd and #flat < (TC.behindRange or 30.0) and (-flat.x * fwd.x - flat.y * fwd.y) < -3.0 then return true end
         -- only once the car is actually there: with points ~20 m apart a big radius
         -- ticked points off one or two ahead of the car (even while still parked)
         if #flat < (TC.viaRadius or 10.0) then return true end
@@ -330,7 +341,22 @@ local dbgAim            -- the last order given to the driver (for the /lastflig
 local function taskTo(veh, ped, route, wp)
     local k = route.aim(wp)
     local p = route.point(k)
-    TaskVehicleDriveToCoordLongrange(ped, veh, p.x, p.y, p.z, curSpeed, LF.DriveStyle(TC.drivingStyle), k >= route.last and TC.arriveRadius or 20.0)
+    -- Under a bridge / on an overpass, GTA's nearest road to a point can be the one
+    -- above or below. Sent there, the planner heads for the wrong level and stalls,
+    -- so aim at the next point along instead (past the bridge).
+    for _ = 1, 3 do
+        if k >= route.last then break end
+        local found, node = GetClosestVehicleNode(p.x, p.y, p.z, 0, 3.0, 0)
+        if not found or math.abs(node.z - p.z) <= 5.0 or #(vector3(node.x - p.x, node.y - p.y, 0.0)) > 15.0 then break end
+        LF.Debug(('Highway drive: point %d sits under / over another road - aiming one further'):format(k))
+        k = k + 1
+        p = route.point(k)
+    end
+    -- the last number is where GTA's driver considers itself arrived and stops. It has
+    -- to be well inside viaRadius, or the driver stops before we count the point as
+    -- reached and give it the next one - and just sits there.
+    local stopAt = k >= route.last and TC.arriveRadius or (TC.viaStop or 3.0)
+    TaskVehicleDriveToCoordLongrange(ped, veh, p.x, p.y, p.z, curSpeed, LF.DriveStyle(TC.drivingStyle), stopAt)
     SetPedKeepTask(ped, true)
     local r = route.raw(k)
     dbgAim = { k = k, p = p, moved = #(vector3(p.x - r.x, p.y - r.y, 0.0)) }
@@ -356,28 +382,41 @@ local thinMap           -- [index in the thinned list] = the recorded point's nu
 local function thinned()
     if thinRoute and thinKey == LF.LayoutVersion then return thinRoute end
     local W, T2 = TC.waypoints, TC.thin or {}
-    if T2.enabled == false then thinMap = nil; return W end
+    local on = T2.enabled ~= false
     local maxGap, keepBend, turnAt = T2.maxGap or 60.0, T2.keepBend or 12.0, T2.turnAt or 6.0
     local keepAfter = T2.keepAfterTurn or 40.0
+    local minGap = T2.minGap or 5.0             -- bunched points (F6 pressed several times in one spot) count as one
+    local function dist(p, q) return #(vector3(p.x - q.x, p.y - q.y, 0.0)) end
+    -- the next recorded point at least minGap on from point k (so a bunch can't fake a sharp bend)
+    local function nextFar(k)
+        for j = k + 1, #W do
+            if dist(W[j], W[k]) >= minGap then return W[j] end
+        end
+        return W[#W]
+    end
     local out = { W[1] }
     local map = { 1 }
     local lastKept, turned, lastTurn = W[1], 0.0, nil
     for k = 2, #W - 1 do
-        local a, b, c = W[k - 1], W[k], W[k + 1]
-        local bend = math.abs(LF.AngleDiff(LF.HeadingOf(vector3(b.x - a.x, b.y - a.y, 0.0)), LF.HeadingOf(vector3(c.x - b.x, c.y - b.y, 0.0))))
-        turned = turned + bend
-        local gap = #(vector3(b.x - lastKept.x, b.y - lastKept.y, 0.0))
-        -- the straight just after a turn keeps its points too, so a corner always
-        -- has exit points to aim at
-        local exiting = lastTurn and #(vector3(b.x - lastTurn.x, b.y - lastTurn.y, 0.0)) <= keepAfter
-        if bend >= turnAt or turned >= keepBend or gap >= maxGap or exiting then
-            out[#out + 1] = b
-            map[#out] = k
-            lastKept, turned = b, 0.0
+        local b = W[k]
+        local gap = dist(b, lastKept)
+        if gap >= minGap then
+            local a, c = lastKept, nextFar(k)
+            local bend = math.abs(LF.AngleDiff(LF.HeadingOf(vector3(b.x - a.x, b.y - a.y, 0.0)), LF.HeadingOf(vector3(c.x - b.x, c.y - b.y, 0.0))))
+            turned = turned + bend
+            -- the straight just after a turn keeps its points too, so a corner always
+            -- has exit points to aim at
+            local exiting = lastTurn and dist(b, lastTurn) <= keepAfter
+            if not on or bend >= turnAt or turned >= keepBend or gap >= maxGap or exiting then
+                out[#out + 1] = b
+                map[#out] = k
+                lastKept, turned = b, 0.0
+            end
+            if bend >= turnAt then lastTurn = b end
         end
-        if bend >= turnAt then lastTurn = b end
     end
     if #W > 1 then
+        if #out > 1 and dist(out[#out], W[#W]) < minGap then out[#out] = nil end    -- keep the real drop-off
         out[#out + 1] = W[#W]
         map[#out] = #W
     end
@@ -428,6 +467,86 @@ CreateThread(function()
     end
 end)
 
+---------------------------------------------------------------------------
+-- Blocked roads (Config.Tour.blockRoads): ramps / side roads the driver keeps
+-- taking by mistake. They're switched off on the game that drives the car for
+-- the length of the drive, so GTA's route planner can't use them, then put back.
+---------------------------------------------------------------------------
+local roadsBlocked = false
+
+local function blockBox(b)
+    local a, z = b.from, b.to
+    local h = b.height or 6.0
+    return a.x, a.y, math.min(a.z, z.z) - h, z.x, z.y, math.max(a.z, z.z) + h, b.width or 8.0
+end
+
+local blockedNow = {}   -- the exact boxes switched off (blocks can be edited mid-drive)
+
+local function setBlockedRoads(on)
+    if on == roadsBlocked then return end
+    local list = on and (TC.blockRoads or {}) or blockedNow
+    for _, b in ipairs(list) do
+        local x1, y1, z1, x2, y2, z2, w = blockBox(b)
+        if on then
+            b.lifted = nil                  -- every drive starts with all of them on
+            SetRoadsInAngledArea(x1, y1, z1, x2, y2, z2, w, false, false, true)
+        else
+            SetRoadsBackToOriginalInAngledArea(x1, y1, z1, x2, y2, z2, w, false)
+        end
+    end
+    if #list > 0 then LF.Debug(('Highway drive: %d blocked road(s) %s'):format(#list, on and 'off' or 'back on')) end
+    blockedNow = on and list or {}
+    roadsBlocked = on
+end
+
+-- The car is standing still near a blocked road: that box most likely also
+-- catches a bit of the car's own road (GTA closes a road where its centre line
+-- is inside the box), so the planner has no way on. Switch that one back on for
+-- the rest of the drive and say which it was, so it can be moved / shortened.
+local function liftBlockNear(pos, range)
+    for i, b in ipairs(blockedNow) do
+        if not b.lifted then
+            local ux, uy = b.to.x - b.from.x, b.to.y - b.from.y
+            local len = math.sqrt(ux * ux + uy * uy)
+            local along = len > 0.1 and math.max(0.0, math.min(len, ((pos.x - b.from.x) * ux + (pos.y - b.from.y) * uy) / len)) or 0.0
+            local cx = b.from.x + (len > 0.1 and ux / len * along or 0.0)
+            local cy = b.from.y + (len > 0.1 and uy / len * along or 0.0)
+            local d = math.sqrt((pos.x - cx) ^ 2 + (pos.y - cy) ^ 2) - (b.width or 8.0) / 2
+            if d < range then
+                local x1, y1, z1, x2, y2, z2, w = blockBox(b)
+                SetRoadsBackToOriginalInAngledArea(x1, y1, z1, x2, y2, z2, w, false)
+                b.lifted = true
+                print(('^3[lastflight]^7 Farewell car stopped next to blocked road %d (%.0f m away) - switched it back on for this drive. It probably covers part of the route\'s road: move it further onto the wrong road or make it shorter.')
+                    :format(i, math.max(0.0, d)))
+                return true
+            end
+        end
+    end
+    return false
+end
+
+AddEventHandler('onResourceStop', function(res)
+    if res == GetCurrentResourceName() then setBlockedRoads(false) end
+end)
+
+-- /lastflight drivetest (the server checks the admin): start a farewell drive at
+-- the route point nearest you, facing along the route
+RegisterNetEvent('lastflight:client:tourTestStart', function()
+    if T then return LFC.Notify('You are already on a farewell drive.', 'error') end
+    local W = thinned()
+    if #W < 3 then return LFC.Notify('The highway loop has no points yet.', 'error') end
+    local me = GetEntityCoords(PlayerPedId())
+    local best, bestD = 1, math.huge
+    for k = 1, #W - 1 do
+        local d = #(vector3(W[k].x - me.x, W[k].y - me.y, (W[k].z - me.z) * 2.0))
+        if d < bestD then best, bestD = k, d end
+    end
+    local p, q = W[best], W[best + 1]
+    local heading = LF.HeadingOf(vector3(q.x - p.x, q.y - p.y, 0.0))
+    LFC.Notify(('Test drive from Highway %d (%.0f m from you).'):format(recordedNo(best), bestD), 'info')
+    TriggerServerEvent('lastflight:server:tourTest', best, { x = p.x, y = p.y, z = p.z + 0.5, w = heading })
+end)
+
 local function drive(t, i)
     local c = t.cars[i]
     if c.driving then return end
@@ -442,6 +561,7 @@ local function drive(t, i)
     SetDriverAbility(ped, 1.0)
     SetDriverAggressiveness(ped, 0.0)
     local route = makeRoute(thinned())
+    setBlockedRoads(true)
     -- city speed until we're on the highway (two checks in a row, so an
     -- overpass or a side street under a bridge doesn't flip it back and forth)
     local fast = TC.citySpeed == nil or onHighway(GetEntityCoords(veh))
@@ -450,6 +570,7 @@ local function drive(t, i)
     local aim = taskTo(veh, ped, route, c.wp)
     local lastPos, lastMoveAt, stage, recoveries = GetEntityCoords(veh), GetGameTimer(), 0, 0
     local loggedK
+    local idleSince, lastNudge = nil, 0
 
     while T == t and t.drivingCar == i do
         Wait(500)
@@ -483,13 +604,24 @@ local function drive(t, i)
 
         if TC.citySpeed then
             if onHighway(pos) ~= fast then streak = streak + 1 else streak = 0 end
-            if streak >= 2 then
+            -- under a bridge / on an overpass GTA often names the OTHER road, so slowing
+            -- down needs the street name to stay non-highway for a while (longer than
+            -- passing any bridge); speeding up when we reach a highway stays quick
+            local need = fast and (TC.leaveHighwayChecks or 6) or 2
+            if streak >= need then
                 fast, streak = not fast, 0
                 LF.Debug(('Highway drive: %s'):format(fast and 'highway speed' or 'city speed'))
             end
         end
         -- city / highway speed, and slower into a sharp turn so it doesn't swing wide
         local want = fast and TC.speed or TC.citySpeed
+        -- slow zones (Config.Tour.slowZones): tricky spots, e.g. where lanes split, so any
+        -- lane change there is gentle instead of a swerve at highway speed
+        for _, z in ipairs(TC.slowZones or {}) do
+            if #(vector3(pos.x - z.pos.x, pos.y - z.pos.y, 0.0)) < (z.radius or 60.0) then
+                want = math.min(want, z.speed or TC.citySpeed or 13.4)
+            end
+        end
         local TS = TC.turnSlow or {}
         if TS.enabled ~= false and route.turnAhead(c.wp, pos, TS.angle or 40.0, TS.distance or 50.0) then
             want = math.min(want, TS.speed or 8.0)
@@ -499,14 +631,30 @@ local function drive(t, i)
             SetDriveTaskCruiseSpeed(ped, curSpeed)
         end
 
-        if route.reached(c.wp, pos) then
+        -- standing still and not at a red light: GTA's driver thinks it has arrived (or
+        -- gave up) - give it its orders again instead of waiting for the long stuck timer
+        if GetEntitySpeed(veh) < 0.5 and not IsVehicleStoppedAtTrafficLights(veh) then
+            idleSince = idleSince or now
+            if now - idleSince > (TC.idleNudge or 4) * 1000 and now - lastNudge > 4000 then
+                lastNudge = now
+                LF.Debug('Farewell car standing still - giving it its orders again')
+                -- stuck beside a blocked road: that block is probably what's in the way
+                liftBlockNear(pos, TC.blockLiftRange or 60.0)
+                aim = taskTo(veh, ped, route, c.wp)
+            end
+        else
+            idleSince = nil
+        end
+
+        local fwd = GetEntityForwardVector(veh)
+        if route.reached(c.wp, pos, fwd) then
             if c.wp >= route.last then
                 TaskVehicleTempAction(ped, veh, 27, 4000)   -- stop at the drop-off
                 TriggerServerEvent('lastflight:server:tourArrived', id, i)
                 break
             end
             -- several close points can be passed in one tick
-            repeat c.wp = c.wp + 1 until c.wp >= route.last or not route.reached(c.wp, pos)
+            repeat c.wp = c.wp + 1 until c.wp >= route.last or not route.reached(c.wp, pos, fwd)
             TriggerServerEvent('lastflight:server:tourProgress', id, i, c.wp)
             if route.aim(c.wp) ~= aim then aim = taskTo(veh, ped, route, c.wp) end
             lastMoveAt, stage = now, 0
@@ -545,6 +693,7 @@ local function drive(t, i)
         end
     end
     c.driving = false
+    setBlockedRoads(false)
     dbg = nil
 end
 
@@ -674,14 +823,15 @@ end
 ---------------------------------------------------------------------------
 -- Spawning (the player who asked)
 ---------------------------------------------------------------------------
-local function spawnCars(id, n)
+-- at: optional { x, y, z, w } to spawn somewhere other than the pickup (admin test drive)
+local function spawnCars(id, n, at)
     local vehHash = LFC.LoadModel(TC.vehicle)
     local pedHash = LFC.LoadModel(TC.driver)
     if not vehHash or not pedHash then
         TriggerServerEvent('lastflight:server:tourSpawned', id, {}, 0)
         return
     end
-    local sp = TC.spawn
+    local sp = at and vector4(at.x, at.y, at.z, at.w or 0.0) or TC.spawn
     local rad = math.rad(sp.w)
     local back = vector3(math.sin(rad), -math.cos(rad), 0.0)    -- opposite of the car's forward vector
     local list = {}
@@ -815,11 +965,11 @@ end)
 ---------------------------------------------------------------------------
 -- Server -> rider
 ---------------------------------------------------------------------------
-RegisterNetEvent('lastflight:client:tourSpawn', function(id, n)
-    CreateThread(function() spawnCars(id, n) end)
+RegisterNetEvent('lastflight:client:tourSpawn', function(id, n, at)
+    CreateThread(function() spawnCars(id, n, at) end)
 end)
 
-RegisterNetEvent('lastflight:client:tourJoin', function(id, list)
+RegisterNetEvent('lastflight:client:tourJoin', function(id, list, _, test)
     if T then return end
     T = { id = id, cars = {}, blips = {}, state = 'waiting' }
     for i, c in ipairs(list or {}) do T.cars[i] = { veh = c.veh, ped = c.ped, wp = 1 } end
@@ -827,6 +977,12 @@ RegisterNetEvent('lastflight:client:tourJoin', function(id, list)
     CreateThread(function()
         local deadline = GetGameTimer() + 5000
         while vehOf(1) == 0 and GetGameTimer() < deadline do Wait(100) end
+        if test and vehOf(1) ~= 0 then
+            -- admin test drive: straight into the back seat, it leaves as soon as you're in
+            local veh = vehOf(1)
+            local seat = IsVehicleSeatFree(veh, 1) and 1 or 0
+            TaskWarpPedIntoVehicle(PlayerPedId(), veh, seat)
+        end
         riderLoop(t)
     end)
 end)

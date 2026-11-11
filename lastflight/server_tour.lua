@@ -190,7 +190,7 @@ local function depart(g)
             if #carRiders(g, idx) == 0 then
                 removeCar(c)
             else
-                c.wp = 1
+                c.wp = g.test and g.test.wp or 1
                 pickController(g, idx, order * TC.stagger)
                 order = order + 1
             end
@@ -303,7 +303,7 @@ RegisterNetEvent('lastflight:server:tourSpawned', function(id, list, capacity)
     g.waitDeadline = now() + 90000
     g.earliestDepart = math.max(g.earliestDepart or 0, now() + TC.minWait * 1000)
     for rider in pairs(g.riders) do
-        TriggerClientEvent('lastflight:client:tourJoin', rider, g.id, g.carList, rider == src)
+        TriggerClientEvent('lastflight:client:tourJoin', rider, g.id, g.carList, rider == src, g.test ~= nil)
     end
     status(g)
 end)
@@ -319,7 +319,32 @@ RegisterNetEvent('lastflight:server:tourSeated', function(id, idx)
     if idx and not g.seatDeadline then
         g.seatDeadline = now() + (TC.buckleTimeout + 30) * 1000
     end
+    if idx and g.test then                                  -- admin test drive: go as soon as you're in
+        g.departAt, g.earliestDepart = now(), now()
+    end
     status(g)
+end)
+
+-- /lastflight drivetest: an admin-only drive that starts at the route point
+-- nearest the admin (worked out by their game) instead of the pickup, with no
+-- waiting at the curb - for testing one part of the loop without the full drive.
+RegisterNetEvent('lastflight:server:tourTest', function(wp, at)
+    local src = source
+    if not Bridge.IsAdmin(src) then return end
+    if not TC.enabled then return Bridge.Notify(src, 'The highway drive is turned off in config.lua.', 'error') end
+    if groupOf(src) then return Bridge.Notify(src, 'You are already on a farewell drive.', 'error') end
+    if LFS.InRide and LFS.InRide(src) then return Bridge.Notify(src, 'You are on the airport shuttle list.', 'error') end
+    wp = math.max(1, math.floor(tonumber(wp) or 1))
+    if type(at) ~= 'table' or not tonumber(at.x) or not tonumber(at.y) or not tonumber(at.z) then return end
+    seq = seq + 1
+    Tours[seq] = {
+        id = seq, state = 'spawning', leader = src, size = 1, wanted = 1,
+        riders = { [src] = true }, seatOf = {}, buckled = {}, cars = {}, carList = {},
+        capacity = TC.seatsPerCar, createdAt = now(), test = { wp = wp },
+    }
+    LF.Debug(('Highway drive #%d: admin test from point %d'):format(seq, wp))
+    TriggerClientEvent('lastflight:client:tourSpawn', src, seq, 1,
+        { x = tonumber(at.x), y = tonumber(at.y), z = tonumber(at.z), w = tonumber(at.w) or 0.0 })
 end)
 
 RegisterNetEvent('lastflight:server:tourBuckle', function(id)

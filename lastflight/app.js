@@ -366,9 +366,10 @@
 
     function renderSetup(s) {
         const panel = $('setup');
-        if (!s.show) { hide('setup'); return; }
+        if (!s.show) { hide('setup'); hide('s-cmds'); return; }
         show('setup');
         panel.classList.toggle('collapsed', !s.focused);
+        renderCommands(s);
         $('s-key-panel').textContent = s.keys.panel;
         $('s-key-panel2').textContent = s.keys.panel;
 
@@ -402,7 +403,17 @@
             const active = s.active === f.key;
             let btns;
             let val;
-            if (f.kind === 'list') {
+            if (f.kind === 'blocks') {
+                // blocked roads: Add here makes a box ahead of you; the rest act on the box nearest you
+                const n = (v || []).length;
+                val = `${n} blocked road${n === 1 ? '' : 's'}`;
+                btns = `<button data-action="blockAdd" data-field="${f.key}" title="Box from where you stand, 40 m the way you face">Add here</button>
+                        <button data-action="blockMove" data-field="${f.key}" ${n ? '' : 'disabled'} title="Re-place the nearest box at your spot and facing">Move nearest here</button>
+                        <button data-action="blockLonger" data-field="${f.key}" ${n ? '' : 'disabled'}>Longer</button>
+                        <button data-action="blockShorter" data-field="${f.key}" ${n ? '' : 'disabled'}>Shorter</button>
+                        <button data-action="blockDel" data-field="${f.key}" ${n ? '' : 'disabled'}>Delete nearest</button>
+                        <button data-action="blockImport" data-field="${f.key}" title="Adds the blocked roads written in config.lua (skips ones already here)">Add config blocks</button>`;
+            } else if (f.kind === 'list') {
                 const n = (v || []).length;
                 val = `${n} point${n === 1 ? '' : 's'}`;
                 if (active) {
@@ -426,7 +437,7 @@
                 <div class="s-val">${val}</div>
                 <div class="s-hint">${esc(f.hint || '')}${active ? (s.insert
                     ? ` &middot; <b>${esc(s.keys.point)}</b> inserts a point where you are`
-                    : ` &middot; <b>${esc(s.keys.point)}</b> adds a point${s.auto ? ` (auto every ${f.spacing || s.spacing} m)` : ''}`) : ''}</div>
+                    : ` &middot; <b>${esc(s.keys.point)}</b> adds a point${s.auto ? ` (auto every ${f.spacing || s.spacing} m)` : ''}`) : ''}${f.kind === 'list' && s.keys.delete ? ` &middot; <b>${esc(s.keys.delete)}</b> deletes the nearest point without opening the panel` : ''}</div>
             </div>`;
         }
         $('s-body').innerHTML = html;
@@ -439,6 +450,70 @@
         $('s-busy').classList.toggle('hidden', !s.busy);
         $('s-save').disabled = !!s.busy || (roll !== undefined && roll < 300);
     }
+
+    // ---------------- Admin chat commands tab ----------------
+    const COMMANDS = [
+        ['Setup & testing', [
+            ['setup', 'Open this setup panel'],
+            ['logbook [id]', 'Give the Flight Logbook to you (or a player id)'],
+            ['drivetest', 'Highway drive from the route point nearest you - test one part fast'],
+            ['debug', 'Debug on / off: F8 messages + where the farewell driver is sent'],
+            ['coords', 'Print your position (for blocked roads, config.lua...)'],
+            ['blocks', 'How many blocked roads are in config.lua, saved and in use'],
+            ['record start | add | print | stop', 'Record a list of positions'],
+        ]],
+        ['Flight', [
+            ['status', 'Flight, passengers, shuttles, highway drives, mode'],
+            ['spawn', 'Put a jet at the parking spot'],
+            ['depart', 'Make the boarding flight leave now'],
+            ['cancel [refund | requeue]', 'Cancel the current flight'],
+            ['reset', 'Reset the flight: passengers put back, jet removed'],
+        ]],
+        ['Settings', [
+            ['mode test | return | kick', 'Test mode, live (back to Legion Square) or live (disconnect)'],
+            ['livery [number | random]', 'Lock the jet\'s paint job (stand by the jet)'],
+            ['clearhistory <id | all>', 'Let a player (or everyone) take the flight again'],
+        ]],
+    ];
+    let cmdsOpen = false;
+    let cmdsBuilt = '';
+
+    function renderCommands(s) {
+        const box = $('s-cmds');
+        box.classList.toggle('hidden', !s.focused);
+        const cmd = s.cmd || 'lastflight';
+        const k = s.keys || {};
+        if (cmdsBuilt !== cmd) {
+            cmdsBuilt = cmd;
+            let html = '';
+            for (const [title, list] of COMMANDS) {
+                html += `<h4>${esc(title)}</h4>`;
+                for (const [c, d] of list) {
+                    html += `<button class="s-cmd" data-cmd="/${esc(cmd)} ${esc(c.split(' ')[0])}"><code>/${esc(cmd)} ${esc(c)}</code><span>${esc(d)}</span></button>`;
+                }
+            }
+            html += `<div class="s-cmds-keys"><b>Keys while moving around</b><br>${esc(k.panel || 'F7')} open / close this panel<br>`
+                + `${esc(k.point || 'F6')} add a route point (while recording)<br>${esc(k.delete || 'F5')} delete the nearest route point<br>Click a command to copy it.</div>`;
+            $('s-cmds-list').innerHTML = html;
+        }
+        $('s-cmds-list').classList.toggle('hidden', !cmdsOpen);
+        $('s-cmds-tab').classList.toggle('on', cmdsOpen);
+    }
+
+    $('s-cmds-tab').onclick = () => {
+        cmdsOpen = !cmdsOpen;
+        $('s-cmds-list').classList.toggle('hidden', !cmdsOpen);
+        $('s-cmds-tab').classList.toggle('on', cmdsOpen);
+    };
+    $('s-cmds-list').addEventListener('click', (e) => {
+        const b = e.target.closest('.s-cmd');
+        if (!b) return;
+        const c = $('clip');
+        c.value = b.dataset.cmd;
+        c.select();
+        try { document.execCommand('copy'); } catch (_) { /* not critical */ }
+        toast({ msg: `Copied ${b.dataset.cmd} - paste it in chat (T)`, kind: 'success', duration: 2500 });
+    });
 
     $('setup').addEventListener('click', (e) => {
         const b = e.target.closest('button[data-action]');

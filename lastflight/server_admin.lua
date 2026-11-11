@@ -13,7 +13,7 @@ local function reply(src, msg)
     end
 end
 
-local help = 'setup | logbook [id] | spawn | status | reset | cancel [refund|requeue] | depart | debug | mode <test|return|kick> | livery [number|random] | clearhistory <id|all> | coords | record <start|add|print|stop>'
+local help = 'setup | logbook [id] | spawn | status | reset | cancel [refund|requeue] | depart | debug | mode <test|return|kick> | livery [number|random] | drivetest | blocks | clearhistory <id|all> | coords | record <start|add|print|stop>'
 
 RegisterCommand(Config.Admin.command, function(src, args)
     local sub = (args[1] or 'status'):lower()
@@ -62,6 +62,23 @@ RegisterCommand(Config.Admin.command, function(src, args)
             return reply(src, 'Current: ' .. LF.Modes[LF.Mode()].label .. '. Usage: /' .. Config.Admin.command .. ' mode test | return | kick')
         end
         LFS.SetMode(src, map[a])   -- saved on the server, survives restarts
+
+    elseif sub == 'blocks' then
+        -- where the highway drive's blocked roads come from right now
+        local saved = 'no saved locations'
+        local raw = GetResourceKvpString('layout')
+        if raw then
+            local ok, data = pcall(json.decode, raw)
+            saved = ok and type(data) == 'table' and (#(data.tourBlocks or {}) .. ' in the saved locations') or 'saved locations unreadable'
+        end
+        reply(src, ('Blocked roads: %d in config.lua | %s | %d in use now | copy-from-config done: %s'):format(
+            #((LF.DefaultLayout and LF.DefaultLayout.tourBlocks) or {}), saved, #(Config.Tour.blockRoads or {}),
+            GetResourceKvpString('blocksMerged2') and 'yes' or 'no'))
+
+    elseif sub == 'drivetest' then
+        -- highway drive test: starts at the route point nearest the admin, leaves straight away
+        if src == 0 then return reply(src, 'Run this in game, standing by the part of the loop you want to test.') end
+        TriggerClientEvent('lastflight:client:tourTestStart', src)
 
     elseif sub == 'livery' then
         -- /lastflight livery          -> shows the parked jet's livery and how many it has

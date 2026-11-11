@@ -462,6 +462,31 @@ local function fromPlainList(list, max)
     return out
 end
 
+-- Blocked roads: { from, to, width, height } boxes. Returns a plain, checked copy
+-- (or nil + what is wrong). Used for config.lua values and saved layouts.
+-- A position given either as a plain { x, y, z } table (saved layouts, the panel)
+-- or as a vec3 from config.lua - in FiveM a vec3 is its own type, not a table.
+local function anyPos(v)
+    if v == nil then return nil end
+    local ok, x, y, z = pcall(function() return v.x, v.y, v.z end)
+    if not ok then return nil end
+    return fromPlain({ x = x, y = y, z = z })
+end
+
+function LF.CleanBlocks(list, max)
+    if type(list) ~= 'table' then return nil, 'is not a list' end
+    local out = {}
+    for i = 1, math.min(#list, max or 80) do
+        local b = list[i]
+        local a, z = type(b) == 'table' and anyPos(b.from), type(b) == 'table' and anyPos(b.to)
+        if not a or not z then return nil, ('block %d has an invalid position'):format(i) end
+        local w = math.max(2.0, math.min(30.0, tonumber(b.width) or 6.0))
+        local h = math.max(1.0, math.min(20.0, tonumber(b.height) or 4.0))
+        out[#out + 1] = { from = plain(a), to = plain(z), width = w, height = h }
+    end
+    return out
+end
+
 -- Every editable location: key -> { kind, max points for routes }
 LF.LayoutFields = {
     npc          = { kind = 'vec4' },
@@ -477,6 +502,7 @@ LF.LayoutFields = {
     tourSpawn    = { kind = 'vec4' },
     tourRoute    = { kind = 'list', max = 1500 },
     tourDropoff  = { kind = 'vec3' },
+    tourBlocks   = { kind = 'blocks', max = 80 },   -- roads switched off during the highway drive
     parking      = { kind = 'vec4' },
     taxiRoute    = { kind = 'list', max = 80 },
     holdPoint    = { kind = 'vec4' },
@@ -496,6 +522,7 @@ function LF.LayoutFromConfig()
     return {
         tourSpawn      = plain(TC.spawn, true),
         tourRoute      = plainList(tourVia),
+        tourBlocks     = LF.CleanBlocks(TC.blockRoads or {}, 80) or {},
         tourDropoff    = plain(TC.waypoints[#TC.waypoints] or CT.waypoints[#CT.waypoints] or Config.Airport.safeReturn),
         cityNpc        = plain(CT.npc, true),
         citySpawn      = plain(CT.spawn, true),
@@ -522,7 +549,11 @@ function LF.ValidateLayout(layout)
         local v = layout[key]
         -- fields added in a later version: take them from config.lua
         if v == nil and LF.DefaultLayout then v = LF.DefaultLayout[key] end
-        if f.kind == 'list' then
+        if f.kind == 'blocks' then
+            local list, bad = LF.CleanBlocks(v or {}, f.max)
+            if not list then return nil, key .. ' ' .. bad end
+            clean[key] = list
+        elseif f.kind == 'list' then
             local list = fromPlainList(v or {}, f.max)
             if not list then return nil, key .. ' has an invalid point' end
             clean[key] = plainList(list)
@@ -559,6 +590,10 @@ function LF.ApplyLayout(layout)
     TC.spawn = fromPlain(L.tourSpawn, true)
     TC.waypoints = fromPlainList(L.tourRoute, 1500) or {}
     TC.waypoints[#TC.waypoints + 1] = fromPlain(L.tourDropoff)
+    TC.blockRoads = {}
+    for _, b in ipairs(L.tourBlocks or {}) do
+        TC.blockRoads[#TC.blockRoads + 1] = { from = fromPlain(b.from), to = fromPlain(b.to), width = b.width, height = b.height }
+    end
     local A = Config.Aircraft
     A.parking      = fromPlain(L.parking, true)
     A.taxiRoute    = fromPlainList(L.taxiRoute, 80) or {}
