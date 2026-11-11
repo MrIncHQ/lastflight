@@ -427,6 +427,7 @@ Config.Tour = {
         maxGap   = 60.0,            -- on straights keep one point about every this many metres
         turnAt   = 6.0,             -- a point where the road bends this many degrees or more is always kept
         keepBend = 12.0,            -- on long gentle curves keep one each time it has turned this much
+        keepAfterTurn = 40.0,       -- every point up to this far after a turn is kept (its exit)
     },
     turnSlow = {                    -- slow down before sharp turns so it doesn't swing wide
         enabled  = true,
@@ -434,8 +435,18 @@ Config.Tour = {
         distance = 50.0,            -- ...coming up within this many metres...
         speed    = 8.0,             -- ...drops it to this speed (m/s, ~18 mph) until it's through
     },
-    snapRadius   = 30.0,            -- each point locks onto a lane going our way within this many metres
-    viaRadius    = 40.0,            -- how close counts as "reached" for loop points (driving past one also counts)
+    corners = {                     -- corners: aim just past a sharp turn so it moves into the turn lane
+        enabled = true,
+        look    = 60.0,             -- a turn within this many metres ahead...
+        bend    = 25.0,             -- ...sharper than this many degrees at one point...
+        past    = 20.0,             -- ...makes it aim at a point this many metres past the end of the turn
+    },
+    splitLook    = 60.0,            -- where a ramp splits off: picks the lane that leads toward the route this far on
+    snapRadius   = 0.0,             -- 0 = drive to your recorded points exactly (recommended for in-lane recordings).
+                                    -- Above 0: move each point onto a road line going our way within this many metres.
+                                    -- That helped rough, hand-placed points but can grab a cross street or a ramp.
+    viaRadius    = 10.0,            -- a point counts as reached this close (points are ~20 m apart)
+    passSide     = 10.0,            -- ...or once the car has driven past it within this many metres to the side
     lookahead    = 1,               -- the driver aims this many points past the next one (smoother, no braking at points)
     arriveRadius = 15.0,            -- drop-off
     stagger      = 3,               -- seconds between convoy cars pulling away

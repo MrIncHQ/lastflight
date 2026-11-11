@@ -181,19 +181,47 @@ local function makeRoute(W)
         return d / #d
     end
 
+    -- the first route point at least `dist` metres on from point k
+    local function ahead(k, dist)
+        local p = W[k]
+        for j = k + 1, last do
+            if #(vector3(W[j].x - p.x, W[j].y - p.y, 0.0)) >= dist then return W[j] end
+        end
+        return W[last]
+    end
+
     local function point(k)
         if cache[k] then return cache[k] end
         local p = W[k]
         local best = p
         local dir = dirAt(k)
-        if dir and k < last then
+        -- snapRadius 0 (default): drive to the recorded point itself. Points recorded
+        -- in the lane don't need moving, and the lane-lock below can move them onto
+        -- the wrong road: a two-way street's node can point either way, so it may
+        -- grab the cross street instead; next to a ramp it may grab the ramp.
+        local snap = TC.snapRadius or 0.0
+        if snap > 0.0 and dir and k < last then
             local want = LF.HeadingOf(dir)
+            local cands = {}
             for n = 1, 8 do
                 local found, node, heading = GetNthClosestVehicleNodeWithHeading(p.x, p.y, p.z, n, 0, 3.0, 0.0)
-                if not found or #(node - p) > (TC.snapRadius or 30.0) then break end
+                if not found or #(node - p) > snap then break end
                 if math.abs(LF.AngleDiff(heading, want)) < 60.0 and math.abs(node.z - p.z) < 6.0 then
-                    best = node
-                    break
+                    cands[#cands + 1] = { node = node, heading = heading }
+                end
+            end
+            if #cands == 1 then
+                best = cands[1].node
+            elseif #cands > 1 then
+                -- Two lanes going our way, e.g. where a ramp splits off the freeway: take
+                -- the one that leads toward the route further on. A ramp curves away from
+                -- it; the road we want keeps pointing at it.
+                local far = ahead(k, TC.splitLook or 60.0)
+                local bestScore
+                for _, c in ipairs(cands) do
+                    local toward = LF.HeadingOf(vector3(far.x - c.node.x, far.y - c.node.y, 0.0))
+                    local score = math.abs(LF.AngleDiff(c.heading, toward))
+                    if not bestScore or score < bestScore - 5.0 then best, bestScore = c.node, score end
                 end
             end
         end
@@ -206,12 +234,20 @@ local function makeRoute(W)
         if math.abs(pos.z - p.z) > 8.0 then return false end
         local flat = vector3(pos.x - p.x, pos.y - p.y, 0.0)
         if k >= last then return #flat < TC.arriveRadius end
-        if #flat < TC.viaRadius then return true end
+        -- only once the car is actually there: with points ~20 m apart a big radius
+        -- ticked points off one or two ahead of the car (even while still parked)
+        if #flat < (TC.viaRadius or 10.0) then return true end
         local dir = dirAt(k)
-        if dir and #flat < 150.0 then
+        if dir and #flat < 60.0 then
             local along = flat.x * dir.x + flat.y * dir.y
             local side = math.abs(flat.x * dir.y - flat.y * dir.x)
-            if along > 0.0 and side < 35.0 then return true end    -- already past it
+            if along > 0.0 and side < (TC.passSide or 10.0) then return true end    -- just driven past it, a lane or two over
+            -- it's behind us and the next point is already closer: we went by it
+            -- further over (wide freeway) - never turn back for it
+            if along > 0.0 and k < last then
+                local q = point(k + 1)
+                if #(vector3(q.x - pos.x, q.y - pos.y, 0.0)) < #flat then return true end
+            end
         end
         return false
     end
@@ -227,8 +263,37 @@ local function makeRoute(W)
         return math.abs(LF.AngleDiff(LF.HeadingOf(d1), LF.HeadingOf(d2))) < 30.0
     end
 
+    -- A sharp corner within the next `cornerLook` metres: aim at a point just past
+    -- it. Given a point in the middle of the turn, GTA's driver just steers at it
+    -- from whatever lane it's in; given one round the corner, its GPS sees a turn
+    -- and moves into the turn lane first, like a normal car.
+    local function cornerExit(wp)
+        local CA = TC.corners or {}
+        if CA.enabled == false then return nil end
+        local look, sharp, past = CA.look or 60.0, CA.bend or 25.0, CA.past or 20.0
+        local dist, lastBend = 0.0, nil
+        for k = math.max(2, wp), math.min(last - 1, wp + 8) do
+            if k > wp then dist = dist + #(vector3(W[k].x - W[k - 1].x, W[k].y - W[k - 1].y, 0.0)) end
+            if dist > look then break end
+            local a, b, c = W[k - 1], W[k], W[k + 1]
+            local bend = math.abs(LF.AngleDiff(LF.HeadingOf(vector3(b.x - a.x, b.y - a.y, 0.0)),
+                LF.HeadingOf(vector3(c.x - b.x, c.y - b.y, 0.0))))
+            if bend > sharp then lastBend = k end
+        end
+        if not lastBend then return nil end
+        -- the first point at least `past` metres beyond the end of the turn (not a
+        -- point count: that could land far round the corner)
+        local from = W[lastBend]
+        for k = lastBend + 1, last do
+            if #(vector3(W[k].x - from.x, W[k].y - from.y, 0.0)) >= past then return k end
+        end
+        return last
+    end
+
     -- which point the driver aims at while heading for point wp
     local function aim(wp)
+        local corner = cornerExit(wp)
+        if corner then return corner end
         local k = wp
         for _ = 1, (TC.lookahead or 1) do
             if not straight(k) then break end
@@ -253,18 +318,22 @@ local function makeRoute(W)
         return total > angle
     end
 
-    return { last = last, point = point, reached = reached, aim = aim, turnAhead = turnAhead }
+    return { last = last, point = point, reached = reached, aim = aim, turnAhead = turnAhead,
+             raw = function(k) return W[k] end }
 end
 
 -- On straight stretches the driver aims past the next point (no braking at
 -- every point); at corners and long gaps it goes point by point.
 local curSpeed = TC.speed
+local dbgAim            -- the last order given to the driver (for the /lastflight debug view)
 
 local function taskTo(veh, ped, route, wp)
     local k = route.aim(wp)
     local p = route.point(k)
     TaskVehicleDriveToCoordLongrange(ped, veh, p.x, p.y, p.z, curSpeed, LF.DriveStyle(TC.drivingStyle), k >= route.last and TC.arriveRadius or 20.0)
     SetPedKeepTask(ped, true)
+    local r = route.raw(k)
+    dbgAim = { k = k, p = p, moved = #(vector3(p.x - r.x, p.y - r.y, 0.0)) }
     return k
 end
 
@@ -283,28 +352,81 @@ end
 -- straights only one every maxGap metres. The saved points aren't changed -
 -- every client thins them the same way, so point numbers match for handover.
 local thinRoute, thinKey
+local thinMap           -- [index in the thinned list] = the recorded point's number (nil = not thinned)
 local function thinned()
     if thinRoute and thinKey == LF.LayoutVersion then return thinRoute end
     local W, T2 = TC.waypoints, TC.thin or {}
-    if T2.enabled == false then return W end
+    if T2.enabled == false then thinMap = nil; return W end
     local maxGap, keepBend, turnAt = T2.maxGap or 60.0, T2.keepBend or 12.0, T2.turnAt or 6.0
+    local keepAfter = T2.keepAfterTurn or 40.0
     local out = { W[1] }
-    local lastKept, turned = W[1], 0.0
+    local map = { 1 }
+    local lastKept, turned, lastTurn = W[1], 0.0, nil
     for k = 2, #W - 1 do
         local a, b, c = W[k - 1], W[k], W[k + 1]
         local bend = math.abs(LF.AngleDiff(LF.HeadingOf(vector3(b.x - a.x, b.y - a.y, 0.0)), LF.HeadingOf(vector3(c.x - b.x, c.y - b.y, 0.0))))
         turned = turned + bend
         local gap = #(vector3(b.x - lastKept.x, b.y - lastKept.y, 0.0))
-        if bend >= turnAt or turned >= keepBend or gap >= maxGap then
+        -- the straight just after a turn keeps its points too, so a corner always
+        -- has exit points to aim at
+        local exiting = lastTurn and #(vector3(b.x - lastTurn.x, b.y - lastTurn.y, 0.0)) <= keepAfter
+        if bend >= turnAt or turned >= keepBend or gap >= maxGap or exiting then
             out[#out + 1] = b
+            map[#out] = k
             lastKept, turned = b, 0.0
         end
+        if bend >= turnAt then lastTurn = b end
     end
-    if #W > 1 then out[#out + 1] = W[#W] end
+    if #W > 1 then
+        out[#out + 1] = W[#W]
+        map[#out] = #W
+    end
     LF.Debug(('Highway drive: %d recorded points -> %d used'):format(#W, #out))
-    thinRoute, thinKey = out, LF.LayoutVersion
+    thinRoute, thinKey, thinMap = out, LF.LayoutVersion, map
     return out
 end
+
+---------------------------------------------------------------------------
+-- /lastflight debug: show where the driver is being sent. Only on the game
+-- that is driving the car (usually whoever started the drive).
+--   red pillar + line  = the spot the driver was told to drive to
+--   green pillar       = the next point it still has to reach
+---------------------------------------------------------------------------
+local dbg
+
+local function recordedNo(k) return thinMap and thinMap[k] or k end
+
+CreateThread(function()
+    while true do
+        if Config.Debug and dbg and T and dbg.t == T then
+            local veh = vehOf(dbg.car)
+            if veh ~= 0 then
+                local pos = GetEntityCoords(veh)
+                local a, n = dbg.aim, dbg.next
+                if n then
+                    DrawMarker(1, n.x, n.y, n.z - 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.6, 1.6, 9.0, 40, 255, 90, 150, false, false, 2, false, nil, nil, false)
+                end
+                if a then
+                    DrawMarker(1, a.x, a.y, a.z - 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.4, 2.4, 14.0, 255, 40, 40, 150, false, false, 2, false, nil, nil, false)
+                    DrawLine(pos.x, pos.y, pos.z + 0.6, a.x, a.y, a.z + 0.6, 255, 40, 40, 255)
+                end
+                SetTextFont(4)
+                SetTextScale(0.42, 0.42)
+                SetTextOutline()
+                SetTextCentre(true)
+                BeginTextCommandDisplayText('STRING')
+                AddTextComponentSubstringPlayerName(('Next: Highway %d   |   Sent to: Highway %d (%.0f m away)%s   |   %.0f mph'):format(
+                    recordedNo(dbg.wp), recordedNo(dbg.aimK), a and #(vector3(a.x - pos.x, a.y - pos.y, 0.0)) or 0.0,
+                    dbg.moved and dbg.moved > 1.0 and (' ~r~moved %.0f m by lane-lock~s~'):format(dbg.moved) or '',
+                    GetEntitySpeed(veh) * 2.237))
+                EndTextCommandDisplayText(0.5, 0.06)
+            end
+            Wait(0)
+        else
+            Wait(500)
+        end
+    end
+end)
 
 local function drive(t, i)
     local c = t.cars[i]
@@ -327,6 +449,7 @@ local function drive(t, i)
     curSpeed = fast and TC.speed or TC.citySpeed
     local aim = taskTo(veh, ped, route, c.wp)
     local lastPos, lastMoveAt, stage, recoveries = GetEntityCoords(veh), GetGameTimer(), 0, 0
+    local loggedK
 
     while T == t and t.drivingCar == i do
         Wait(500)
@@ -344,6 +467,19 @@ local function drive(t, i)
             lastPos, lastMoveAt, stage = pos, now, 0
         end
         local stalled = (now - lastMoveAt) / 1000
+
+        -- /lastflight debug: where the driver is being sent (drawn by the debug thread, logged to F8)
+        if Config.Debug and dbgAim then
+            dbg = { t = t, car = i, aim = dbgAim.p, aimK = dbgAim.k, moved = dbgAim.moved, next = route.point(c.wp), wp = c.wp }
+            if loggedK ~= dbgAim.k then
+                loggedK = dbgAim.k
+                print(('[lastflight] next Highway %d -> driver sent to Highway %d (%.0f m away)%s'):format(
+                    recordedNo(c.wp), recordedNo(dbgAim.k), #(vector3(dbgAim.p.x - pos.x, dbgAim.p.y - pos.y, 0.0)),
+                    dbgAim.moved > 1.0 and (' [moved %.0f m by lane-lock]'):format(dbgAim.moved) or ''))
+            end
+        else
+            dbg = nil
+        end
 
         if TC.citySpeed then
             if onHighway(pos) ~= fast then streak = streak + 1 else streak = 0 end
@@ -409,6 +545,7 @@ local function drive(t, i)
         end
     end
     c.driving = false
+    dbg = nil
 end
 
 ---------------------------------------------------------------------------
