@@ -570,6 +570,28 @@ local function taxiPreview(d)
     return previewPath
 end
 
+-- The highway loop (1000+ points) and pins are too many to check every frame, so
+-- which of them are near you (and the closest few to number) is worked out twice
+-- a second; each frame only draws that short list.
+local nearCache = { at = 0 }
+
+local function nearIndexes(list, first, me, labelRange)
+    local idx, labels = {}, {}
+    local prev = first
+    local far2, lab2 = 500.0 * 500.0, labelRange * labelRange
+    for i, p in ipairs(list or {}) do
+        local dp = (p.x - me.x) ^ 2 + (p.y - me.y) ^ 2 + (p.z - me.z) ^ 2
+        local dq = prev and ((prev.x - me.x) ^ 2 + (prev.y - me.y) ^ 2 + (prev.z - me.z) ^ 2) or math.huge
+        if dp < far2 or dq < far2 then
+            idx[#idx + 1] = i
+            if dp < lab2 then labels[#labels + 1] = { i = i, d = dp } end
+        end
+        prev = p
+    end
+    table.sort(labels, function(x, y) return x.d < y.d end)
+    return idx, labels
+end
+
 CreateThread(function()
     while true do
         if Setup.open and Setup.draft then
@@ -633,47 +655,49 @@ CreateThread(function()
             local showLine = not pinsRoute or Setup.active == 'tourRoute'
             local showPins = pinsRoute or Setup.active == 'tourPins'
 
+            local now = GetGameTimer()
+            if now >= nearCache.at then
+                nearCache.at = now + 500
+                nearCache.route, nearCache.routeLabels = nearIndexes(d.tourRoute, d.tourSpawn, me, 150.0)
+                nearCache.pins, nearCache.pinLabels = nearIndexes(d.tourPins, d.tourSpawn, me, 250.0)
+            end
+
             if showLine then
                 -- highway drive: pickup -> loop -> drop-off (purple). GTA can only place 32
-                -- floating labels per frame, and a long loop has far more points nearby, so
-                -- only the closest ones get their number (the rest keep their circle)
-                local tprev = d.tourSpawn
-                local labels = {}
-                for i, p in ipairs(d.tourRoute) do
-                    if near(p) or near(tprev) then
-                        line(tprev, p, 170, 110, 255)
+                -- floating labels per frame, so only the closest ones get their number
+                local list = d.tourRoute
+                for _, i in ipairs(nearCache.route or {}) do
+                    local p, prev = list[i], i == 1 and d.tourSpawn or list[i - 1]
+                    if p and prev then
+                        line(prev, p, 170, 110, 255)
                         marker(p, 170, 110, 255)
-                        local dist = #(vec(p) - me)
-                        if dist < 150.0 then labels[#labels + 1] = { i = i, p = p, d = dist } end
                     end
-                    tprev = p
                 end
-                if near(tprev) or near(d.tourDropoff) then line(tprev, d.tourDropoff, 170, 110, 255) end
-                table.sort(labels, function(x, y) return x.d < y.d end)
+                local lastP = list[#list]
+                if lastP and (near(lastP) or near(d.tourDropoff)) then line(lastP, d.tourDropoff, 170, 110, 255) end
+                local labels = nearCache.routeLabels or {}
                 for n = 1, math.min(#labels, 14) do       -- leaves room under the 32-label limit for pin numbers
-                    local l = labels[n]
-                    text3d(vector3(l.p.x, l.p.y, l.p.z + 1.4), ('Highway %d'):format(l.i))
+                    local p = list[labels[n].i]
+                    if p then text3d(vector3(p.x, p.y, p.z + 1.4), ('Highway %d'):format(labels[n].i)) end
                 end
             end
 
             if showPins then
                 -- key pins (orange): pickup -> pins -> drop-off, the closest 10 numbered
-                local pprev = d.tourSpawn
-                local pinLabels = {}
-                for i, p in ipairs(d.tourPins or {}) do
-                    if near(p) or near(pprev) then
-                        line(pprev, p, 255, 150, 30)
+                local list = d.tourPins or {}
+                for _, i in ipairs(nearCache.pins or {}) do
+                    local p, prev = list[i], i == 1 and d.tourSpawn or list[i - 1]
+                    if p and prev then
+                        line(prev, p, 255, 150, 30)
                         marker(p, 255, 150, 30)
-                        local dist = #(vec(p) - me)
-                        if dist < 250.0 then pinLabels[#pinLabels + 1] = { i = i, p = p, d = dist } end
                     end
-                    pprev = p
                 end
-                if #(d.tourPins or {}) > 0 and (near(pprev) or near(d.tourDropoff)) then line(pprev, d.tourDropoff, 255, 150, 30) end
-                table.sort(pinLabels, function(x, y) return x.d < y.d end)
-                for n = 1, math.min(#pinLabels, 10) do
-                    local l = pinLabels[n]
-                    text3d(vector3(l.p.x, l.p.y, l.p.z + 1.8), ('Pin %d'):format(l.i))
+                local lastP = list[#list]
+                if lastP and (near(lastP) or near(d.tourDropoff)) then line(lastP, d.tourDropoff, 255, 150, 30) end
+                local labels = nearCache.pinLabels or {}
+                for n = 1, math.min(#labels, 10) do
+                    local p = list[labels[n].i]
+                    if p then text3d(vector3(p.x, p.y, p.z + 1.8), ('Pin %d'):format(labels[n].i)) end
                 end
             end
 
