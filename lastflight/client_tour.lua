@@ -454,8 +454,11 @@ CreateThread(function()
                 SetTextOutline()
                 SetTextCentre(true)
                 BeginTextCommandDisplayText('STRING')
-                AddTextComponentSubstringPlayerName(('Next: Highway %d   |   Sent to: Highway %d (%.0f m away)%s   |   %.0f mph'):format(
-                    recordedNo(dbg.wp), recordedNo(dbg.aimK), a and #(vector3(a.x - pos.x, a.y - pos.y, 0.0)) or 0.0,
+                -- key pins mode numbers its pins directly; the line mode maps back to recorded points
+                local num, word = recordedNo, 'Highway'
+                if dbg.pins then num, word = function(k) return k end, 'Pin' end
+                AddTextComponentSubstringPlayerName(('Next: %s %d   |   Sent to: %s %d (%.0f m away)%s   |   %.0f mph'):format(
+                    word, num(dbg.wp), word, num(dbg.aimK), a and #(vector3(a.x - pos.x, a.y - pos.y, 0.0)) or 0.0,
                     dbg.moved and dbg.moved > 1.0 and (' ~r~moved %.0f m by lane-lock~s~'):format(dbg.moved) or '',
                     GetEntitySpeed(veh) * 2.237))
                 EndTextCommandDisplayText(0.5, 0.06)
@@ -531,8 +534,150 @@ end)
 
 -- /lastflight drivetest (the server checks the admin): start a farewell drive at
 -- the route point nearest you, facing along the route
+---------------------------------------------------------------------------
+-- Route: Key pins (setup panel toggle). Driven like the airport shuttle: GTA's
+-- own GPS route to one pin, and once the car is within pinRadius of it (or has
+-- driven past it) it goes on to the next. Nothing else steers it - blocked roads
+-- keep it off wrong roads and slow zones / city-highway speeds still apply.
+-- The recorded-line driving below is not used in this mode.
+---------------------------------------------------------------------------
+local function pinsMode()
+    return GlobalState.lf_tourRoute == 'pins' and #(TC.pins or {}) > 0
+end
+
+-- the pins, then the drop-off
+local function pinList()
+    local W = {}
+    for _, p in ipairs(TC.pins or {}) do W[#W + 1] = p end
+    W[#W + 1] = TC.waypoints[#TC.waypoints]
+    return W
+end
+
+local function drivePins(t, i, c, veh, ped)
+    local id = t.id
+    local W = pinList()
+    local last = #W
+    local k = math.max(1, math.min(last, math.floor(tonumber(c.wp) or 1)))
+    local fast = TC.citySpeed == nil or onHighway(GetEntityCoords(veh))
+    local speed = fast and TC.speed or TC.citySpeed
+    local streak, idleSince, lastNudge = 0, nil, 0
+    local lastPos, lastMoveAt, recoveries = GetEntityCoords(veh), GetGameTimer(), 0
+
+    local function order()
+        local p = W[k]
+        local stopAt = k >= last and TC.arriveRadius or (TC.pinStop or 3.0)
+        TaskVehicleDriveToCoordLongrange(ped, veh, p.x, p.y, p.z, speed, LF.DriveStyle(TC.drivingStyle), stopAt)
+        SetPedKeepTask(ped, true)
+        if Config.Debug then print(('[lastflight] key pins: driving to pin %d of %d'):format(k, last)) end
+    end
+
+    -- done with pin j: close enough, or it's behind the car (never turn back for one)
+    local function done(j, pos, fwd)
+        local p = W[j]
+        if math.abs(pos.z - p.z) > 8.0 then return false end
+        local d = #(vector3(pos.x - p.x, pos.y - p.y, 0.0))
+        if j >= last then return d < TC.arriveRadius end
+        if d < (TC.pinRadius or 30.0) then return true end
+        return d < 80.0 and ((p.x - pos.x) * fwd.x + (p.y - pos.y) * fwd.y) < -3.0
+    end
+
+    order()
+    while T == t and t.drivingCar == i do
+        Wait(500)
+        local now = GetGameTimer()
+        veh, ped = vehOf(i), pedOf(i)
+        if veh == 0 or ped == 0 or IsEntityDead(veh) or IsEntityDead(ped) then
+            TriggerServerEvent('lastflight:server:tourFailed', id, i)
+            break
+        end
+        if not NetworkHasControlOfEntity(veh) then NetworkRequestControlOfEntity(veh) end
+        if not NetworkHasControlOfEntity(ped) then NetworkRequestControlOfEntity(ped) end
+        local pos = GetEntityCoords(veh)
+        local fwd = GetEntityForwardVector(veh)
+
+        dbg = Config.Debug and { t = t, car = i, aim = W[k], aimK = k, next = W[k], wp = k, pins = true } or nil
+
+        -- next pin
+        if done(k, pos, fwd) then
+            if k >= last then
+                TaskVehicleTempAction(ped, veh, 27, 4000)   -- stop at the drop-off
+                TriggerServerEvent('lastflight:server:tourArrived', id, i)
+                break
+            end
+            repeat k = k + 1 until k >= last or not done(k, pos, fwd)
+            c.wp = k
+            TriggerServerEvent('lastflight:server:tourProgress', id, i, k)
+            order()
+            lastMoveAt = now
+        end
+
+        -- speed: city / highway (slow to give it up under bridges), slow zones
+        if TC.citySpeed then
+            if onHighway(pos) ~= fast then streak = streak + 1 else streak = 0 end
+            if streak >= (fast and (TC.leaveHighwayChecks or 6) or 2) then fast, streak = not fast, 0 end
+        end
+        local want = fast and TC.speed or TC.citySpeed
+        for _, z in ipairs(TC.slowZones or {}) do
+            if #(vector3(pos.x - z.pos.x, pos.y - z.pos.y, 0.0)) < (z.radius or 60.0) then
+                want = math.min(want, z.speed or TC.citySpeed or 13.4)
+            end
+        end
+        if want ~= speed then
+            speed = want
+            SetDriveTaskCruiseSpeed(ped, speed)
+        end
+
+        -- standing still (not at a red light): orders again; next to a blocked road,
+        -- that block is switched back on for this drive (it may cover the car's road)
+        if GetEntitySpeed(veh) < 0.5 and not IsVehicleStoppedAtTrafficLights(veh) then
+            idleSince = idleSince or now
+            if now - idleSince > (TC.idleNudge or 4) * 1000 and now - lastNudge > 4000 then
+                lastNudge = now
+                liftBlockNear(pos, TC.blockLiftRange or 60.0)
+                order()
+            end
+        else
+            idleSince = nil
+        end
+
+        -- really stuck: fade and put it at its pin, facing the next one
+        if #(pos - lastPos) > 3.0 or IsVehicleStoppedAtTrafficLights(veh) then lastPos, lastMoveAt = pos, now end
+        if now - lastMoveAt > (TC.stuckTime or 20) * 2000 then
+            recoveries = recoveries + 1
+            lastPos, lastMoveAt = pos, now
+            if recoveries > (TC.maxStuckRecoveries or 6) then
+                TriggerServerEvent('lastflight:server:tourFailed', id, i)
+                break
+            end
+            local p, q = W[k], W[math.min(last, k + 1)]
+            TriggerServerEvent('lastflight:server:tourBlink', id, i)
+            fadeBlink(function()
+                SetEntityCoords(veh, p.x, p.y, p.z + 0.5, false, false, false, false)
+                SetEntityHeading(veh, LF.HeadingOf(vector3(q.x - p.x, q.y - p.y, 0.0)))
+                SetVehicleOnGroundProperly(veh)
+            end)
+            order()
+        end
+    end
+end
+
 RegisterNetEvent('lastflight:client:tourTestStart', function()
     if T then return LFC.Notify('You are already on a farewell drive.', 'error') end
+    if pinsMode() then
+        -- key pins: start at the pin nearest you, facing the next one
+        local W = pinList()
+        local me = GetEntityCoords(PlayerPedId())
+        local best, bestD = 1, math.huge
+        for k = 1, #W - 1 do
+            local d = #(vector3(W[k].x - me.x, W[k].y - me.y, (W[k].z - me.z) * 2.0))
+            if d < bestD then best, bestD = k, d end
+        end
+        local p, q = W[best], W[best + 1]
+        LFC.Notify(('Test drive (key pins) from pin %d (%.0f m from you).'):format(best, bestD), 'info')
+        TriggerServerEvent('lastflight:server:tourTest', best,
+            { x = p.x, y = p.y, z = p.z + 0.5, w = LF.HeadingOf(vector3(q.x - p.x, q.y - p.y, 0.0)) })
+        return
+    end
     local W = thinned()
     if #W < 3 then return LFC.Notify('The highway loop has no points yet.', 'error') end
     local me = GetEntityCoords(PlayerPedId())
@@ -560,6 +705,15 @@ local function drive(t, i)
     SetBlockingOfNonTemporaryEvents(ped, true)
     SetDriverAbility(ped, 1.0)
     SetDriverAggressiveness(ped, 0.0)
+    if pinsMode() then
+        -- Route: Key pins (setup panel toggle) - its own simple driver
+        setBlockedRoads(true)
+        drivePins(t, i, c, veh, ped)
+        c.driving = false
+        setBlockedRoads(false)
+        dbg = nil
+        return
+    end
     local route = makeRoute(thinned())
     setBlockedRoads(true)
     -- city speed until we're on the highway (two checks in a row, so an

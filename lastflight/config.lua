@@ -442,6 +442,13 @@ Config.Tour = {
         bend    = 25.0,             -- ...sharper than this many degrees at one point...
         past    = 20.0,             -- ...makes it aim at a point this many metres past the end of the turn
     },
+    -- Route: 'line' = follow the recorded Highway loop, 'pins' = drive GPS-style from key pin to key
+    -- pin (Highway pins), like the airport shuttle. Only the first default: switched in the setup panel.
+    routeMode    = 'line',
+    pins         = {},              -- key pins (placed in game: setup panel -> Highway pins)
+    pinRadius    = 30.0,            -- key pins: a pin is done this close (or once the car has driven past it)
+    pinStop      = 3.0,             -- key pins: GTA's driver only stops this close (keep well under pinRadius)
+
     -- Slow zones: tricky spots where the car should ease off, e.g. where lanes split, so a lane
     -- change there is gentle instead of a swerve at highway speed. pos = centre, radius in metres,
     -- speed in m/s (13.4 = 30 mph). snap (optional, metres): inside the zone each point is locked onto

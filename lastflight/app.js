@@ -391,6 +391,15 @@
         $('s-lights-btns').innerHTML = [['stop', 'Stop at red', !s.runLights], ['run', 'Drive through', !!s.runLights]]
             .map(([v, label, on]) => `<button class="s-switch ${on ? 'on' : ''}" data-action="lights" data-mode="${v}">${label}</button>`).join('');
 
+        // highway drive route: the recorded line (current) or key pins (GPS pin to pin)
+        const pins = (s.draft && s.draft.tourPins) ? s.draft.tourPins.length : 0;
+        $('s-tourroute-desc').textContent = s.tourRoute === 'pins'
+            ? (pins ? `Drives GPS-style from pin to pin (${pins} Highway pins), like the airport shuttle.`
+                    : 'Key pins is on but there are no Highway pins yet - it uses the recorded line until you add some.')
+            : 'Follows the recorded Highway loop (the current driving).';
+        $('s-tourroute-btns').innerHTML = [['line', 'Recorded line', s.tourRoute !== 'pins'], ['pins', 'Key pins', s.tourRoute === 'pins']]
+            .map(([v, label, on]) => `<button class="s-switch ${on ? 'on' : ''}" data-action="tourRoute" data-mode="${v}">${label}</button>`).join('');
+
         const st = $('s-state');
         st.className = 's-state' + (s.dirty ? ' dirty' : s.saved ? ' saved' : '');
         st.textContent = s.dirty ? 'Unsaved changes' : s.saved ? 'Saved layout active' : 'Using config.lua';
@@ -525,7 +534,7 @@
             setTimeout(() => { delete b.dataset.armed; b.textContent = 'Factory reset'; }, 3000);
             return;
         }
-        if ((action === 'mode' || action === 'lights') && b.classList.contains('on')) return;
+        if ((action === 'mode' || action === 'lights' || action === 'tourRoute') && b.classList.contains('on')) return;
         post('setupAction', { action, field: b.dataset.field, mode: b.dataset.mode });
     });
 

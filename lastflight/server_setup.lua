@@ -152,6 +152,30 @@ function LFS.SetLivery(src, value)
     reply(src, ('Jet livery locked to %d. The parked jet changes within a few seconds.'):format(n), 'success')
 end
 
+---------------------------------------------------------------------------
+-- Highway drive route: 'line' (the recorded Highway loop) or 'pins' (key pins,
+-- driven GPS-style pin to pin like the airport shuttle). Saved on the server.
+---------------------------------------------------------------------------
+local ROUTE_KVP = 'tourroute'
+do
+    local v = GetResourceKvpString(ROUTE_KVP) or Config.Tour.routeMode or 'line'
+    GlobalState.lf_tourRoute = v == 'pins' and 'pins' or 'line'
+end
+
+function LFS.SetTourRoute(src, mode)
+    if not allowed(src) then return reply(src, 'No permission.', 'error') end
+    mode = mode == 'pins' and 'pins' or 'line'
+    SetResourceKvp(ROUTE_KVP, mode)
+    GlobalState.lf_tourRoute = mode
+    if src ~= 0 then TriggerClientEvent('lastflight:client:setupTourRoute', src, mode) end
+    reply(src, mode == 'pins' and 'Highway drive now drives pin to pin (Highway pins).'
+        or 'Highway drive now follows the recorded line (Highway loop).', 'success')
+end
+
+RegisterNetEvent('lastflight:server:setTourRoute', function(mode)
+    LFS.SetTourRoute(source, tostring(mode))
+end)
+
 RegisterNetEvent('lastflight:server:setRunLights', function(on)
     LFS.SetRunLights(source, on == true)
 end)
@@ -167,6 +191,7 @@ function LFS.OpenSetup(src)
         mode     = LF.Mode(),
         returnTo = Config.Farewell.returnTo,
         runLights = GlobalState.lf_runLights == true,
+        tourRoute = GlobalState.lf_tourRoute or 'line',
     })
 end
 

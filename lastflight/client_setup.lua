@@ -22,6 +22,8 @@ local FIELDS = {
       hint = 'Sit in a car where the first farewell car should wait, facing the way it leaves. Extra convoy cars line up behind it. Players start it from the city NPC (G).' },
     { key = 'tourRoute',      group = 'Highway drive', kind = 'list', ground = true, label = 'Highway loop (via points)', spacing = 20.0,
       hint = 'The driver follows these points GPS-style. Clear it, then Record with Auto on (a point every 20 m) and drive the loop in the lane you want; add F6 points through tight turns. The purple line shows your recorded route.' },
+    { key = 'tourPins',       group = 'Highway drive', kind = 'list', ground = true, label = 'Highway pins (Key pins route)', spacing = 300.0,
+      hint = 'Only used when Route is set to Key pins. Drive the loop and press F6 for each pin: on every corner you want it to turn at, just past splits it must go straight through, and every few hundred metres on highways. The car drives GPS-style from pin to pin, like the airport shuttle.' },
     { key = 'tourDropoff',    group = 'Highway drive', kind = 'vec3', ground = true, label = 'Highway drive drop-off',
       hint = 'Where the farewell cars let players out at the end (by the check-in desk).' },
     { key = 'tourBlocks',     group = 'Highway drive', kind = 'blocks', label = 'Blocked roads',
@@ -108,6 +110,7 @@ local function push()
         focused = Setup.focused, stats = stats(),
         mode = Setup.mode, modes = LF.Modes, modeOrder = LF.ModeOrder, returnTo = Setup.returnTo,
         runLights = Setup.runLights,
+        tourRoute = Setup.tourRoute,
         keys = { panel = Config.Admin.setupKey, point = Config.Admin.setupPointKey, delete = Config.Admin.setupDeleteKey or 'F5' },
         cmd = Config.Admin.command,
         spacing = Config.Admin.autoRecordSpacing,
@@ -129,6 +132,7 @@ end
 local ROUTE_ENDS = {
     cityRoute    = { 'citySpawn', 'cityDropoff' },
     tourRoute    = { 'tourSpawn', 'tourDropoff' },
+    tourPins     = { 'tourSpawn', 'tourDropoff' },
     shuttleRoute = { 'shuttleSpawn', 'shuttleDropoff' },
     taxiRoute    = { 'parking', 'holdPoint' },
 }
@@ -335,6 +339,7 @@ RegisterNetEvent('lastflight:client:setupOpen', function(data)
     Setup.saved, Setup.busy, Setup.route = data.saved, data.busy, data.route
     Setup.mode, Setup.returnTo = data.mode, data.returnTo
     Setup.runLights = data.runLights == true
+    Setup.tourRoute = data.tourRoute or 'line'
     Setup.dirty, Setup.active, Setup.auto, Setup.insert = false, nil, false, false
     Setup.open = true
     LFC.Nui('hidePanels')
@@ -344,6 +349,11 @@ end)
 RegisterNetEvent('lastflight:client:setupMode', function(mode)
     Setup.mode = mode
     Config.Farewell.mode = mode
+    push()
+end)
+
+RegisterNetEvent('lastflight:client:setupTourRoute', function(mode)
+    Setup.tourRoute = mode
     push()
 end)
 
@@ -392,6 +402,9 @@ local function toConfigText(d)
         'Config.Tour.spawn = ' .. v4s(d.tourSpawn),
         'Config.Tour.waypoints = {',
         tourVia .. (tourVia ~= '' and '\n' or '') .. '    ' .. v3s(d.tourDropoff) .. ',   -- drop-off',
+        '}',
+        'Config.Tour.pins = {',
+        list(d.tourPins or {}, '    '),
         '}',
         'Config.Tour.blockRoads = {',
         blocks(d.tourBlocks or {}),
@@ -472,6 +485,8 @@ RegisterNUICallback('setupAction', function(data, cb)
         TriggerServerEvent('lastflight:server:setupFactory')
     elseif a == 'mode' and LF.Modes[data.mode or ''] then
         TriggerServerEvent('lastflight:server:setMode', data.mode)
+    elseif a == 'tourRoute' then
+        TriggerServerEvent('lastflight:server:setTourRoute', data.mode == 'pins' and 'pins' or 'line')
     elseif a == 'lights' then
         TriggerServerEvent('lastflight:server:setRunLights', data.mode == 'run')
     elseif a == 'export' then
@@ -501,7 +516,8 @@ RegisterKeyMapping('lastflight_setup_point', 'Last Flight: add route point (admi
 -- recording / inserting into, otherwise the highway loop
 RegisterCommand('lastflight_setup_delete', function()
     if not Setup.open or Setup.focused then return end
-    local key = (Setup.active and FIELD[Setup.active] and FIELD[Setup.active].kind == 'list') and Setup.active or 'tourRoute'
+    local key = (Setup.active and FIELD[Setup.active] and FIELD[Setup.active].kind == 'list') and Setup.active
+        or (Setup.tourRoute == 'pins' and 'tourPins' or 'tourRoute')
     deleteNearest(key)
     PlaySoundFrontend(-1, 'BACK', 'HUD_FRONTEND_DEFAULT_SOUNDSET', true)
 end, false)
@@ -611,25 +627,54 @@ CreateThread(function()
                 end
             end
 
-            -- highway drive: pickup -> loop -> drop-off (purple). GTA can only place 32
-            -- floating labels per frame, and a long loop has far more points nearby, so
-            -- only the closest ones get their number (the rest keep their circle)
-            local tprev = d.tourSpawn
-            local labels = {}
-            for i, p in ipairs(d.tourRoute) do
-                if near(p) or near(tprev) then
-                    line(tprev, p, 170, 110, 255)
-                    marker(p, 170, 110, 255)
-                    local dist = #(vec(p) - me)
-                    if dist < 150.0 then labels[#labels + 1] = { i = i, p = p, d = dist } end
+            -- Only the points of the route the drive uses are shown (Route switch at the
+            -- top), so the other set stays out of the way - unless you are recording into it.
+            local pinsRoute = Setup.tourRoute == 'pins'
+            local showLine = not pinsRoute or Setup.active == 'tourRoute'
+            local showPins = pinsRoute or Setup.active == 'tourPins'
+
+            if showLine then
+                -- highway drive: pickup -> loop -> drop-off (purple). GTA can only place 32
+                -- floating labels per frame, and a long loop has far more points nearby, so
+                -- only the closest ones get their number (the rest keep their circle)
+                local tprev = d.tourSpawn
+                local labels = {}
+                for i, p in ipairs(d.tourRoute) do
+                    if near(p) or near(tprev) then
+                        line(tprev, p, 170, 110, 255)
+                        marker(p, 170, 110, 255)
+                        local dist = #(vec(p) - me)
+                        if dist < 150.0 then labels[#labels + 1] = { i = i, p = p, d = dist } end
+                    end
+                    tprev = p
                 end
-                tprev = p
+                if near(tprev) or near(d.tourDropoff) then line(tprev, d.tourDropoff, 170, 110, 255) end
+                table.sort(labels, function(x, y) return x.d < y.d end)
+                for n = 1, math.min(#labels, 14) do       -- leaves room under the 32-label limit for pin numbers
+                    local l = labels[n]
+                    text3d(vector3(l.p.x, l.p.y, l.p.z + 1.4), ('Highway %d'):format(l.i))
+                end
             end
-            if near(tprev) or near(d.tourDropoff) then line(tprev, d.tourDropoff, 170, 110, 255) end
-            table.sort(labels, function(x, y) return x.d < y.d end)
-            for n = 1, math.min(#labels, 20) do
-                local l = labels[n]
-                text3d(vector3(l.p.x, l.p.y, l.p.z + 1.4), ('Highway %d'):format(l.i))
+
+            if showPins then
+                -- key pins (orange): pickup -> pins -> drop-off, the closest 10 numbered
+                local pprev = d.tourSpawn
+                local pinLabels = {}
+                for i, p in ipairs(d.tourPins or {}) do
+                    if near(p) or near(pprev) then
+                        line(pprev, p, 255, 150, 30)
+                        marker(p, 255, 150, 30)
+                        local dist = #(vec(p) - me)
+                        if dist < 250.0 then pinLabels[#pinLabels + 1] = { i = i, p = p, d = dist } end
+                    end
+                    pprev = p
+                end
+                if #(d.tourPins or {}) > 0 and (near(pprev) or near(d.tourDropoff)) then line(pprev, d.tourDropoff, 255, 150, 30) end
+                table.sort(pinLabels, function(x, y) return x.d < y.d end)
+                for n = 1, math.min(#pinLabels, 10) do
+                    local l = pinLabels[n]
+                    text3d(vector3(l.p.x, l.p.y, l.p.z + 1.8), ('Pin %d'):format(l.i))
+                end
             end
 
             -- shuttle: pickup -> via -> drop-off (blue)

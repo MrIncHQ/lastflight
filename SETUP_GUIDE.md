@@ -58,6 +58,8 @@ Any server admin can set it up. Being an admin in the **txAdmin** web panel is n
 
 To test one part of the drive without doing the whole loop, stand by that part of the route and type `/lastflight drivetest`. A farewell car spawns on the nearest point and drives on from there.
 
+**Highway drive route:** the setup panel has a switch at the top: **Recorded line** (follows the Highway loop) or **Key pins** (drives GPS-style from pin to pin, like the airport bus). For Key pins, record **Highway pins** with F6: one on every corner it should turn at, one just past every split it should go straight through, and one every few hundred metres on highways. Blocked roads work in both.
+
 ## 6. Highway drive pop-ups
 
 During the highway drive, place names and short quotes pop up as the car passes. Change them in `lastflight/config.lua` under `Config.Tour.viewpoints`. Each pop-up is one line:

@@ -502,6 +502,7 @@ LF.LayoutFields = {
     tourSpawn    = { kind = 'vec4' },
     tourRoute    = { kind = 'list', max = 1500 },
     tourDropoff  = { kind = 'vec3' },
+    tourPins     = { kind = 'list', max = 300 },     -- key pins (Route: Key pins)
     tourBlocks   = { kind = 'blocks', max = 80 },   -- roads switched off during the highway drive
     parking      = { kind = 'vec4' },
     taxiRoute    = { kind = 'list', max = 80 },
@@ -522,6 +523,7 @@ function LF.LayoutFromConfig()
     return {
         tourSpawn      = plain(TC.spawn, true),
         tourRoute      = plainList(tourVia),
+        tourPins       = plainList(TC.pins or {}),
         tourBlocks     = LF.CleanBlocks(TC.blockRoads or {}, 80) or {},
         tourDropoff    = plain(TC.waypoints[#TC.waypoints] or CT.waypoints[#CT.waypoints] or Config.Airport.safeReturn),
         cityNpc        = plain(CT.npc, true),
@@ -590,6 +592,7 @@ function LF.ApplyLayout(layout)
     TC.spawn = fromPlain(L.tourSpawn, true)
     TC.waypoints = fromPlainList(L.tourRoute, 1500) or {}
     TC.waypoints[#TC.waypoints + 1] = fromPlain(L.tourDropoff)
+    TC.pins = fromPlainList(L.tourPins, 300) or {}
     TC.blockRoads = {}
     for _, b in ipairs(L.tourBlocks or {}) do
         TC.blockRoads[#TC.blockRoads + 1] = { from = fromPlain(b.from), to = fromPlain(b.to), width = b.width, height = b.height }
