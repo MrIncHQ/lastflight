@@ -54,7 +54,7 @@ Any server admin can set it up. Being an admin in the **txAdmin** web panel is n
 
 **Jet paint job:** GTA picks one at random. To keep one, stand by the parked jet and type `/lastflight livery 0`, then `1`, `2` and so on until you like it. The last one is kept. `/lastflight livery random` lets GTA pick again.
 
-**Highway drive:** the Legion Square driver also offers a farewell drive around the island (press **G** at the NPC). To change its loop, open the **Highway drive** section, click **Clear** on the loop, then **Record** with **Auto** on and drive the highways once. Save when you're back.
+**Highway drive:** the Legion Square driver also offers a farewell drive around the island (target the NPC and pick **Farewell highway drive**). To change its loop, open the **Highway drive** section, click **Clear** on the loop, then **Record** with **Auto** on and drive the highways once. Save when you're back.
 
 To test one part of the drive without doing the whole loop, stand by that part of the route and type `/lastflight drivetest`. A farewell car spawns on the nearest point and drives on from there.
 

@@ -17,7 +17,7 @@ Built for **Qbox** with **ox_lib**, **ox_inventory** and **ox_target**.
 - Players keep a torn ticket stub as a souvenir.
 
 ### The farewell highway drive
-- A driver at Legion Square offers a last drive around the island (press **G** at the driver). Riders buckle up with **B** once seated.
+- A driver at Legion Square offers a last drive around the island (look at the driver with your target eye and pick **Farewell highway drive**). Riders buckle up with **B** once seated.
 - Groups of up to 12 people can go together, in up to 4 cars with an NPC driver and 3 passengers each.
 - A group's cars leave together as a convoy. The next group can head out 2 minutes later, with up to 8 cars on the road at once.
 - The drive comes with its own soundtrack, and place names with short quotes pop up as you pass landmarks.
