@@ -11,13 +11,13 @@ Built for **Qbox** with **ox_lib**, **ox_inventory** and **ox_target**.
 ### The last flight
 - Players buy a ticket at the LSIA check-in desk and get a ticket item.
 - A shuttle takes them to the gate, where they board one shared jet together.
-- They buckle up, the captain makes an announcement, and the jet taxis out and takes off.
+- They buckle up with **B**, the captain makes an announcement, and the jet taxis out and takes off.
 - The jet circles the whole island for about 10 minutes while music plays.
 - It heads out over the ocean and the screen fades to **ENJOY YOUR TIME IN GTA VI**.
 - Players keep a torn ticket stub as a souvenir.
 
 ### The farewell highway drive
-- A driver at Legion Square offers a last drive around the island (press **G**).
+- A driver at Legion Square offers a last drive around the island (press **G** at the driver). Riders buckle up with **B** once seated.
 - Groups get their own car with an NPC driver, with up to 3 passengers per car.
 - The cars leave a couple of minutes apart, in a convoy of up to 8.
 - The drive comes with its own soundtrack, and place names with short quotes pop up as you pass landmarks.
