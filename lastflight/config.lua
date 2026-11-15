@@ -2051,8 +2051,12 @@ Config.FinalDeparture = {
 Config.Audio = {
     -- Optional captain announcement at the runway, before the seatbelt chime.
     pilot    = { enabled = false, file = 'audio/pilot.mp3', volume = 0.9, fallbackDuration = 20 },
-    -- Optional chime with the seatbelt warning at the runway (off: on-screen warning only).
-    seatbelt = { enabled = false, file = 'audio/seatbelt.mp3', volume = 0.7, fallbackDuration = 3 },
+    -- Seatbelt sign at the runway. chime = true plays a built-in cabin "ding" (no file needed).
+    -- enabled = true plays your own file instead of the built-in ding.
+    seatbelt = { enabled = false, chime = true, file = 'audio/seatbelt.mp3', volume = 0.7, fallbackDuration = 3 },
+    -- Speech played after everyone has buckled up, before the takeoff roll.
+    -- Takeoff starts once it has finished. fallbackDuration = its length in seconds (1:17 = 77).
+    speech   = { enabled = true, file = 'audio/flightspeech/Adam.mp3', volume = 0.9, fallbackDuration = 77 },
     musicFadeDuration    = 6,    -- seconds the music fades at the very end (with the screen fade)
     announcementTimeout  = 120,  -- hard cap (s) the server waits for everyone's announcement to finish
 }

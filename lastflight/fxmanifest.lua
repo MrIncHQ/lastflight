@@ -39,5 +39,6 @@ files {
     'app.js',
     'audio/*.mp3',
     'audio/lastdrive/*.mp3',
+    'audio/flightspeech/*.mp3',
     'audio/*.ogg',
 }

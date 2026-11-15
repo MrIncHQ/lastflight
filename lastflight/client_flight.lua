@@ -222,6 +222,7 @@ local function enterPhase(state, elapsedMs)
         local pre = {}
         if Config.Audio.seatbelt.enabled then pre[1] = { kind = 'seatbelt', file = Config.Audio.seatbelt.file } end
         if Config.Audio.pilot.enabled then pre[#pre + 1] = { kind = 'pilot', file = Config.Audio.pilot.file } end
+        if Config.Audio.speech and Config.Audio.speech.enabled then pre[#pre + 1] = { kind = 'speech', file = Config.Audio.speech.file } end
         for _, t in ipairs(Config.Music.tracks) do pre[#pre + 1] = { kind = 'music', file = t.file } end
         LFC.Nui('preload', pre)
 
@@ -231,6 +232,7 @@ local function enterPhase(state, elapsedMs)
     elseif state == S.TAKEOFF then
         F.buckling = false
         LFC.Nui('buckle', { show = false })
+        LFC.Nui('audioFade', { kind = 'speech', duration = 1000 })   -- only matters if takeoff was forced early
         if CIN.enabled then
             Cams.Sequence(CIN.takeoffShots, veh, false, function() return F.thirdPerson end)
         end
@@ -284,14 +286,24 @@ end)
 RegisterNUICallback('audioDone', function(data, cb)
     if data.kind == 'pilot' and F.active then
         TriggerServerEvent('lastflight:server:audioDone', F.flightId)
+    elseif data.kind == 'speech' and F.active then
+        TriggerServerEvent('lastflight:server:speechDone', F.flightId)
     end
     cb(1)
+end)
+
+-- After everyone has buckled up: the speech. Takeoff waits until it has finished.
+RegisterNetEvent('lastflight:client:speech', function(flightId)
+    if not F.active or flightId ~= F.flightId then return end
+    local a = Config.Audio.speech
+    LFC.Nui('audio', { kind = 'speech', file = a.file, volume = a.volume, fallback = a.fallbackDuration, report = true })
 end)
 
 RegisterNetEvent('lastflight:client:seatbelt', function(flightId, requireBuckle)
     if not F.active or flightId ~= F.flightId then return end
     local a = Config.Audio.seatbelt
-    if a.enabled then LFC.Nui('audio', { kind = 'seatbelt', file = a.file, volume = a.volume }) end
+    if a.enabled then LFC.Nui('audio', { kind = 'seatbelt', file = a.file, volume = a.volume })
+    elseif a.chime then LFC.Nui('chime', { volume = a.volume }) end
     LFC.Nui('seatbelt', { on = true })
     if requireBuckle then
         F.buckling = true

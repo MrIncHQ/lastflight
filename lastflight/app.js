@@ -265,6 +265,34 @@
         volTimer = setTimeout(() => hide('vol'), 1500);
     }
 
+    // Cabin chime (seatbelt sign on): a soft bell made here, no audio file needed
+    let chimeCtx = null;
+    function playChime({ volume = 0.7 } = {}) {
+        try {
+            chimeCtx = chimeCtx || new (window.AudioContext || window.webkitAudioContext)();
+            const ctx = chimeCtx;
+            if (ctx.state === 'suspended') ctx.resume();
+            const t0 = ctx.currentTime + 0.05;
+            const out = ctx.createGain();
+            out.gain.value = Math.max(0, Math.min(1, volume));
+            out.connect(ctx.destination);
+            // a bell = main tone + quieter overtones, quick strike and a slow fade
+            [[880, 1], [1760, 0.25], [2640, 0.08]].forEach(([freq, level]) => {
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'sine';
+                o.frequency.value = freq;
+                g.gain.setValueAtTime(0.0001, t0);
+                g.gain.exponentialRampToValueAtTime(0.5 * level, t0 + 0.01);
+                g.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.2);
+                o.connect(g);
+                g.connect(out);
+                o.start(t0);
+                o.stop(t0 + 2.3);
+            });
+        } catch (_) { /* no Web Audio: skip the chime */ }
+    }
+
     function stopTrack(kind) {
         if (kind === 'music' && playlist) { playlist.cancel = true; playlist = null; }
         const a = tracks[kind];
@@ -616,6 +644,7 @@
                 });
                 break;
             case 'audio': playTrack(data); break;
+            case 'chime': playChime(data); break;
             case 'playlist': playPlaylist(data); break;
             case 'musicVolume': setMusicVolume(data); break;
             case 'buckle': renderBuckle(data); break;

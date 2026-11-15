@@ -250,7 +250,7 @@ local function newFlight()
     return {
         id = flightSeq, state = S.IDLE, passengers = {}, seats = {}, badSeats = {},
         seatCapacity = nil, controller = nil, groundOffset = nil,
-        pendingAudio = nil, pendingFarewell = nil, lastSync = 0,
+        pendingAudio = nil, pendingSpeech = nil, pendingFarewell = nil, lastSync = 0,
     }
 end
 
@@ -295,6 +295,7 @@ local function removePassenger(src, reason, policy)
     if p.seat and Flight.seats[p.seatKey] == src then Flight.seats[p.seatKey] = nil end
     if Flight.pendingAudio then Flight.pendingAudio[src] = nil end
     if Flight.pendingBuckle then Flight.pendingBuckle[src] = nil end
+    if Flight.pendingSpeech then Flight.pendingSpeech[src] = nil end
     if Flight.pendingFarewell then Flight.pendingFarewell[src] = nil end
     if Flight.controller == src then Flight.controller = nil end
 
@@ -418,7 +419,17 @@ function startPhase(state, elapsedMs)
     })
 end
 
--- Runway: [optional captain announcement] -> seatbelt chime -> everyone buckles -> TAKEOFF
+-- Runway: [optional captain announcement] -> seatbelt chime -> everyone buckles -> [speech] -> TAKEOFF
+-- After everyone buckles: play the speech (if on); the tick starts TAKEOFF once it has finished
+local function afterBuckle()
+    local a = Config.Audio.speech
+    if not (a and a.enabled) then return startPhase(S.TAKEOFF) end
+    Flight.pendingSpeech = {}
+    for src in pairs(Flight.passengers) do Flight.pendingSpeech[src] = true end
+    Flight.speechDeadline = now() + math.max(Config.Audio.announcementTimeout, (a.fallbackDuration or 0) + 15) * 1000
+    toPassengers('lastflight:client:speech', Flight.id)
+end
+
 local function seatbeltSequence()
     Flight.pendingAudio = nil
     Flight.audioDeadline = nil
@@ -434,7 +445,7 @@ local function seatbeltSequence()
     else
         SetTimeout((chime + 3) * 1000, function()
             if Flight and Flight.id == id and Flight.state == S.RUNWAY_WAIT then
-                startPhase(S.TAKEOFF)
+                afterBuckle()
             end
         end)
     end
@@ -746,6 +757,9 @@ CreateThread(function()
                     and (countTable(f.pendingBuckle) == 0 or t >= f.buckleDeadline) then
                     f.pendingBuckle = nil
                     toPassengers('lastflight:client:buckleDone', f.id)
+                    afterBuckle()
+                elseif f.pendingSpeech and (countTable(f.pendingSpeech) == 0 or t >= f.speechDeadline) then
+                    f.pendingSpeech = nil
                     startPhase(S.TAKEOFF)
                 end
 
@@ -785,7 +799,8 @@ local function estimateBoarding()
     local elapsed = (now() - (Flight.phaseStart or now())) / 1000
     for _, st in ipairs(order) do
         local dur = st == S.RUNWAY_WAIT and ((Config.Audio.pilot.enabled and Config.Audio.pilot.fallbackDuration or 0)
-            + (Config.Audio.seatbelt.enabled and Config.Audio.seatbelt.fallbackDuration or 1) + (Config.Seatbelt.requireBuckle and Config.Seatbelt.timeout or 1) + 2)
+            + (Config.Audio.seatbelt.enabled and Config.Audio.seatbelt.fallbackDuration or 1) + (Config.Seatbelt.requireBuckle and Config.Seatbelt.timeout or 1) + 2
+            + (Config.Audio.speech and Config.Audio.speech.enabled and Config.Audio.speech.fallbackDuration or 0))
             or LF.Timeline[st].duration
         if st == Flight.state then
             counting = true
@@ -1421,6 +1436,12 @@ RegisterNetEvent('lastflight:server:audioDone', function(flightId)
     local src = source
     if not Flight or Flight.id ~= flightId or not Flight.pendingAudio then return end
     Flight.pendingAudio[src] = nil
+end)
+
+RegisterNetEvent('lastflight:server:speechDone', function(flightId)
+    local src = source
+    if not Flight or Flight.id ~= flightId or not Flight.pendingSpeech then return end
+    Flight.pendingSpeech[src] = nil
 end)
 
 RegisterNetEvent('lastflight:server:farewellDone', function(flightId)
