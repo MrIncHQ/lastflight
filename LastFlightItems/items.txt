@@ -1,5 +1,5 @@
 -- === Last Flight to Vice City items ===
--- Images: copy the two PNGs from "Inventory Images" (this folder) to
+-- Images: copy the three PNGs from "Inventory Images" (this folder) to
 --   ox_inventory:     ox_inventory/web/images/
 --   jaksam_inventory: your jaksam images folder
 --
@@ -40,7 +40,7 @@
 	},
 
 -- ---------------------------------------------------------------
--- jaksam_inventory  ->  create two items in jaksam's item creator
+-- jaksam_inventory  ->  create three items in jaksam's item creator
 -- ---------------------------------------------------------------
 -- Name: lastflight_ticket        Label: Boarding Pass        Weight: 0   Stackable: no   Image: lastflight_ticket.png
 -- Name: lastflight_ticket_stub   Label: Boarding Pass Stub   Weight: 0   Stackable: no   Image: lastflight_ticket_stub.png

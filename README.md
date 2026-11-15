@@ -9,8 +9,9 @@ Built for **Qbox** with **ox_lib**, **ox_inventory** and **ox_target**.
 ## What it does
 
 ### The last flight
+- A free bus at Legion Square takes players to the airport (target the driver and pick **Ride to LSIA**).
 - Players buy a ticket at the LSIA check-in desk and get a ticket item.
-- A shuttle takes them to the gate, where they board one shared jet together.
+- A shuttle can take them out to the jet, where everyone boards one shared flight together.
 - They buckle up with **B**, the captain makes an announcement, and the jet taxis out and takes off.
 - The jet circles the whole island for about 10 minutes while music plays.
 - It heads out over the ocean and the screen fades to **ENJOY YOUR TIME IN GTA VI**.
