@@ -1666,7 +1666,7 @@ Config.Tour = {
     },
     -- Route: 'line' = follow the recorded Highway loop, 'pins' = drive GPS-style from key pin to key
     -- pin (Highway pins), like the airport shuttle. Only the first default: switched in the setup panel.
-    routeMode    = 'line',
+    routeMode    = 'pins',
     pins = {                    -- key pins (placed in game: setup panel -> Highway pins)
         vec3(262.86, -862.72, 28.26),
         vec3(266.60, -885.64, 28.05),
