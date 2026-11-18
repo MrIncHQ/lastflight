@@ -206,10 +206,38 @@
         </footer>
     </section>
 
-    <!-- admin chat commands: a tab on the side of the setup panel -->
+    <!-- side tabs of the setup panel: admin chat commands + props -->
     <aside id="s-cmds" class="hidden">
-        <button class="s-cmds-tab" id="s-cmds-tab" title="Admin chat commands">COMMANDS</button>
+        <div class="s-tabs">
+            <button class="s-cmds-tab" id="s-cmds-tab" title="Admin chat commands">COMMANDS</button>
+            <button class="s-cmds-tab" id="s-props-tab" title="Place props (party area)">PROPS</button>
+        </div>
         <div class="s-cmds-list hidden" id="s-cmds-list"></div>
+        <div class="s-cmds-list s-props hidden" id="s-props">
+            <h4>Place a prop</h4>
+            <select id="p-model"></select>
+            <input id="p-custom" type="text" maxlength="64" placeholder="Model name, e.g. prop_bench_01a" class="hidden">
+            <input id="p-text" type="text" maxlength="60" placeholder="Sign text, e.g. FINAL DEPARTURES" class="hidden">
+            <button class="btn primary p-place" id="p-place">Place</button>
+            <div class="s-cmds-keys"><b>Mouse</b> point where it goes &middot; <b>Hold right mouse</b> look around &middot; <b>Mouse wheel</b> rotate (Ctrl = fine) &middot; <b>Up / Down</b> height &middot; <b>E or click</b> place &middot; <b>Hold Shift</b> keep placing &middot; <b>Backspace</b> cancel</div>
+            <div id="p-music">
+                <h4 class="p-head">Party music</h4>
+                <div class="p-empty" id="p-music-state"></div>
+                <div class="p-vol">
+                    <span>Volume</span>
+                    <input type="range" id="p-music-vol" min="0" max="100" step="5" value="40">
+                    <b id="p-music-vol-val">40%</b>
+                </div>
+                <div class="p-music-btns">
+                    <button class="btn primary" id="p-music-here">Place music center here</button>
+                    <button class="p-mini" id="p-music-go">Go</button>
+                    <button class="p-mini p-del" id="p-music-off">Remove</button>
+                </div>
+            </div>
+            <h4 class="p-head">Placed <span id="p-count"></span><button class="p-mini" id="p-refresh" title="Update the distances">Refresh</button></h4>
+            <div id="p-list"></div>
+            <button class="p-clear" id="p-clear">Delete all props</button>
+        </div>
     </aside>
 
     <div id="toasts"></div>

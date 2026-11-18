@@ -114,14 +114,19 @@ local function push()
         keys = { panel = Config.Admin.setupKey, point = Config.Admin.setupPointKey, delete = Config.Admin.setupDeleteKey or 'F5' },
         cmd = Config.Admin.command,
         spacing = Config.Admin.autoRecordSpacing,
+        props = LFC.PropsPanel and LFC.PropsPanel() or nil,
+        placing = LFC.PropsPlacing and LFC.PropsPlacing() or false,
     })
 end
+LFC.SetupPush = push
+function LFC.SetupIsOpen() return Setup.open end
 
 local function setFocus(state)
     Setup.focused = state
     LFC.Focus(state)
     push()
 end
+function LFC.SetupFocus(state) if Setup.open then setFocus(state) end end
 
 local function changed()
     Setup.dirty = true
@@ -318,6 +323,7 @@ end
 
 local function close()
     Setup.open, Setup.active, Setup.auto, Setup.insert = false, nil, false, false
+    if LFC.PropsCancel then LFC.PropsCancel() end
     LFC.Nui('setup', { show = false })
     if Setup.focused then LFC.Focus(false) end
     Setup.focused = false

@@ -60,7 +60,24 @@ To test one part of the drive without doing the whole loop, stand by that part o
 
 **Highway drive route:** the setup panel has a switch at the top: **Recorded line** (follows the Highway loop) or **Key pins** (drives GPS-style from pin to pin, like the airport bus). For Key pins, record **Highway pins** with F6: one on every corner it should turn at, one just past every split it should go straight through, and one every few hundred metres on highways. Blocked roads work in both.
 
-## 6. Highway drive pop-ups
+## 6. Props (party area)
+
+Open the setup panel and click the **PROPS** tab on its side (under **COMMANDS**).
+
+1. Pick a prop from the list and click **Place**. A see-through copy appears.
+2. Point with the mouse where it should go. Hold **right mouse** to look around. **Mouse wheel** turns it (hold **Ctrl** for small steps), **Up / Down** arrows raise or lower it.
+3. **E** or **left click** places it. Hold **Shift** while placing to place another. **Backspace** cancels.
+
+Props save straight away and every player sees them. The list under **Placed** shows them nearest first, with **Go**, **Move** and **Delete**.
+
+- **Sign (3D text)**: type the text (for example `FINAL DEPARTURES`) and place it like a prop.
+- **Custom model name**: type any GTA prop name to place something not on the list.
+- **Drinks**: champagne, cocktails, beer and whisky props let players target them and pick **Pour a glass** to have a drink.
+- To add props to the list, edit `Config.Props` in `lastflight/config.lua`. A prop marked "not found" doesn't exist in the game.
+
+**Party music:** stand where the music should come from and click **Place music center here**. The party song loops from that spot at 40% volume and fades out about 45 m away, so only people at the party hear it. Players on the flight or the highway drive don't hear it. **Remove** turns it off. Change the song, volume or distance under `music` in `Config.Props`.
+
+## 7. Highway drive pop-ups
 
 During the highway drive, place names and short quotes pop up as the car passes. Change them in `lastflight/config.lua` under `Config.Tour.viewpoints`. Each pop-up is one line:
 
@@ -99,4 +116,4 @@ Players who take the airport bus from Legion Square instead of the highway drive
 | txAdmin in-game menu won't open | In txAdmin, edit the admin and make sure their **Cfx.re** or **Discord** ID matches the account they play on |
 | Players got kicked while testing | Switch the mode to **Test** |
 | Highway car leaves the highway | Re-record the **Highway drive** loop (see step 5) |
-| Resource won't start after editing pop-ups | A quote with an apostrophe must use double quotes (see step 6) |
+| Resource won't start after editing pop-ups | A quote with an apostrophe must use double quotes (see step 7) |

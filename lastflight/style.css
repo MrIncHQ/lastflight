@@ -411,3 +411,40 @@ kbd {
 .s-cmd code { display: block; font: 600 0.8rem/1.3 Consolas, monospace; color: #ffd36e; }
 .s-cmd span { display: block; margin-top: 2px; color: rgba(255,255,255,0.65); font-size: 0.72rem; }
 .s-cmds-keys { margin-top: 10px; color: rgba(255,255,255,0.7); font-size: 0.72rem; line-height: 1.7; }
+
+/* side tabs stacked: COMMANDS, PROPS under it */
+.s-tabs { display: flex; flex-direction: column; gap: 6px; }
+
+/* PROPS tab */
+.s-props select, .s-props input {
+    display: block; width: 100%; margin-bottom: 8px; padding: 8px 10px; border-radius: 8px;
+    background: rgba(255,255,255,0.06); color: #fff; border: 1px solid rgba(255,255,255,0.15); font: inherit;
+}
+.s-props select option, .s-props select optgroup { background: #0d1424; color: #fff; }
+.s-props .hidden { display: none; }
+.s-props .p-place { width: 100%; }
+.s-props .p-head { margin-top: 14px; display: flex; align-items: center; gap: 6px; }
+.s-props .p-head span { color: rgba(255,255,255,0.6); font-size: 0.85rem; }
+.p-mini, .p-row button, .p-clear {
+    padding: 4px 8px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 0.72rem;
+    background: rgba(255,255,255,0.06); color: #fff; border: 1px solid rgba(255,255,255,0.15);
+}
+.p-mini { margin-left: auto; }
+.p-mini:hover, .p-row button:hover { border-color: rgba(24, 209, 197, 0.6); }
+.p-row { display: flex; align-items: center; gap: 4px; padding: 6px 8px; margin-bottom: 3px; border-radius: 8px; background: rgba(255,255,255,0.04); }
+.p-row .p-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p-row .p-dist { color: rgba(255,255,255,0.55); font-size: 0.72rem; margin-right: 4px; }
+.p-row button.p-del:hover, .p-clear:hover { border-color: #ff5a6e; background: rgba(255, 90, 110, 0.15); }
+.p-empty { color: rgba(255,255,255,0.55); font-size: 0.75rem; padding: 4px 0; }
+.p-clear { margin-top: 10px; width: 100%; padding: 7px; }
+.p-vol { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.p-vol span { color: rgba(255,255,255,0.75); font-size: 0.75rem; }
+.s-props .p-vol input { flex: 1; margin: 0; padding: 0; background: none; border: none; accent-color: var(--teal); }
+.p-vol b { width: 3em; text-align: right; font-size: 0.8rem; }
+.p-music-btns { display: flex; gap: 6px; align-items: stretch; margin-top: 4px; }
+.p-music-btns .btn { flex: 1; }
+.p-music-btns .p-mini { margin-left: 0; }
+button.p-del:hover { border-color: #ff5a6e; background: rgba(255, 90, 110, 0.15); }
+
+/* while a prop is being placed the panel fades so you can see past it */
+#setup.placing, #setup.placing.collapsed { opacity: 0.25; transition: opacity 0.2s; }

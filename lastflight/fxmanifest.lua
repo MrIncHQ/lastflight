@@ -21,6 +21,7 @@ client_scripts {
     'client_cameras.lua',
     'client_flight.lua',
     'client_setup.lua',
+    'client_props.lua',
 }
 
 server_scripts {
@@ -40,5 +41,6 @@ files {
     'audio/*.mp3',
     'audio/lastdrive/*.mp3',
     'audio/flightspeech/*.mp3',
+    'audio/PartySong/*.mp3',
     'audio/*.ogg',
 }

@@ -292,3 +292,164 @@ RegisterNetEvent('lastflight:server:setupFactory', function()
     TriggerClientEvent('lastflight:client:setupSaved', src, { saved = false, route = routeSummary() })
     reply(src, 'Saved locations cleared - back to the values in config.lua.', 'success')
 end)
+
+---------------------------------------------------------------------------
+-- Props (setup panel -> PROPS tab). Saved on the server as soon as they are
+-- placed, moved or deleted, and shared with every client via GlobalState.
+-- Separate from the locations: "Factory reset" does not remove them.
+---------------------------------------------------------------------------
+local PROPS_KVP = 'props'
+local Props, propSeq = {}, 0
+
+local function num(v, lo, hi)
+    v = tonumber(v)
+    if not v or v ~= v or v < lo or v > hi then return nil end
+    return math.floor(v * 1000 + 0.5) / 1000
+end
+
+-- a placed prop from the client (or the KVP), cleaned; nil if it's bad
+local function cleanProp(d)
+    if type(d) ~= 'table' then return nil end
+    local model = tostring(d.model or '')
+    if #model < 1 or #model > 64 or not model:match('^[%w_%-]+$') then return nil end
+    local p = {
+        model = model,
+        x = num(d.x, -10000, 10000), y = num(d.y, -10000, 10000), z = num(d.z, -500, 3000),
+        h = num(d.h, -720, 720) or 0.0,
+    }
+    if not (p.x and p.y and p.z) then return nil end
+    p.h = p.h % 360
+    if model == '__text' then
+        local text = tostring(d.text or ''):gsub('[%c<>~]', ''):sub(1, 60)
+        if text:match('^%s*$') then return nil end
+        p.text = text
+    end
+    return p
+end
+
+local function publishProps()
+    GlobalState.lf_props = Props
+end
+
+local function saveProps()
+    SetResourceKvp(PROPS_KVP, json.encode(Props))
+    publishProps()
+end
+
+do
+    local raw = GetResourceKvpString(PROPS_KVP)
+    local ok, data = pcall(json.decode, raw or '[]')
+    if ok and type(data) == 'table' then
+        for _, d in ipairs(data) do
+            local p = cleanProp(d)
+            if p then
+                p.id = tonumber(d.id) or (propSeq + 1)
+                propSeq = math.max(propSeq, p.id)
+                Props[#Props + 1] = p
+            end
+        end
+    end
+    if #Props > 0 then print(('^5[lastflight]^7 %d placed prop(s) loaded'):format(#Props)) end
+    publishProps()
+end
+
+local function propIndex(id)
+    id = tonumber(id)
+    for i, p in ipairs(Props) do
+        if p.id == id then return i end
+    end
+end
+
+RegisterNetEvent('lastflight:server:propAdd', function(d)
+    local src = source
+    if not allowed(src) then return end
+    if not (Config.Props and Config.Props.enabled) then return end
+    if #Props >= (Config.Props.max or 200) then
+        return reply(src, ('Prop limit reached (%d). Delete some first.'):format(Config.Props.max or 200), 'error')
+    end
+    local p = cleanProp(d)
+    if not p then return reply(src, 'That prop could not be placed.', 'error') end
+    propSeq = propSeq + 1
+    p.id = propSeq
+    Props[#Props + 1] = p
+    saveProps()
+end)
+
+RegisterNetEvent('lastflight:server:propMove', function(id, d)
+    local src = source
+    if not allowed(src) then return end
+    local i = propIndex(id)
+    if not i then return end
+    local p = cleanProp(d)
+    if not p then return reply(src, 'That prop could not be moved.', 'error') end
+    p.id = Props[i].id
+    Props[i] = p
+    saveProps()
+end)
+
+RegisterNetEvent('lastflight:server:propDelete', function(id)
+    local src = source
+    if not allowed(src) then return end
+    local i = propIndex(id)
+    if not i then return end
+    table.remove(Props, i)
+    saveProps()
+end)
+
+RegisterNetEvent('lastflight:server:propClear', function()
+    local src = source
+    if not allowed(src) then return end
+    local n = #Props
+    Props = {}
+    saveProps()
+    print(('^5[lastflight]^7 %s removed all %d placed props'):format(GetPlayerName(src) or src, n))
+    reply(src, ('Removed all %d props.'):format(n), 'success')
+end)
+
+-- Party music center: one spot the party song loops from (PROPS tab).
+-- startedAt lets every player hear the same part of the song.
+local MUSIC_KVP = 'partymusic'
+do
+    local ok, m = pcall(json.decode, GetResourceKvpString(MUSIC_KVP) or 'null')
+    if ok and type(m) == 'table' and tonumber(m.x) and tonumber(m.y) and tonumber(m.z) then
+        GlobalState.lf_partyMusic = { x = m.x, y = m.y, z = m.z, startedAt = os.time() }
+    else
+        GlobalState.lf_partyMusic = nil
+    end
+end
+
+RegisterNetEvent('lastflight:server:partyMusicSet', function(pos)
+    local src = source
+    if not allowed(src) then return end
+    if type(pos) ~= 'table' then return end
+    local x, y, z = num(pos.x, -10000, 10000), num(pos.y, -10000, 10000), num(pos.z, -500, 3000)
+    if not (x and y and z) then return end
+    SetResourceKvp(MUSIC_KVP, json.encode({ x = x, y = y, z = z }))
+    GlobalState.lf_partyMusic = { x = x, y = y, z = z, startedAt = os.time() }
+    reply(src, 'Party music now plays from here.', 'success')
+end)
+
+-- Party music volume (0-1), set with the slider in the PROPS tab. Kept separate from
+-- the music center so changing it never restarts the song.
+local MUSIC_VOL_KVP = 'partymusicvol'
+do
+    local v = tonumber(GetResourceKvpString(MUSIC_VOL_KVP) or '')
+    GlobalState.lf_partyVolume = v or ((Config.Props and Config.Props.music and Config.Props.music.volume) or 0.4)
+end
+
+RegisterNetEvent('lastflight:server:partyMusicVolume', function(v)
+    local src = source
+    if not allowed(src) then return end
+    v = num(v, 0, 1)
+    if not v then return end
+    SetResourceKvp(MUSIC_VOL_KVP, tostring(v))
+    GlobalState.lf_partyVolume = v
+end)
+
+RegisterNetEvent('lastflight:server:partyMusicClear', function()
+    local src = source
+    if not allowed(src) then return end
+    DeleteResourceKvp(MUSIC_KVP)
+    GlobalState.lf_partyMusic = nil
+    reply(src, 'Party music removed.', 'success')
+end)

@@ -2186,3 +2186,91 @@ Config.Admin = {
     setupDeleteKey = 'F5',  -- delete the route point nearest you (without opening the panel)
     autoRecordSpacing = 15.0, -- metres between points when auto-record is on
 }
+
+---------------------------------------------------------------------------
+-- PROPS (setup panel -> PROPS tab)
+-- Admins place props in game to build a little party area. They save on the
+-- server straight away and show for every player. Add any GTA prop to the
+-- list below (model name from a prop browser, e.g. gta.mics.dev/tools/prop-finder).
+-- Models that don't exist in the game are shown as "not found" in the list.
+-- drink = 'champagne' / 'cocktail' / 'beer' / 'whisky': players get "Pour a glass" on
+-- that prop (ox_target) and drink one with an animation.
+---------------------------------------------------------------------------
+Config.Props = {
+    enabled       = true,
+    spawnDistance = 150.0,   -- props appear for players within this many metres
+    max           = 200,     -- most props that can be placed in total
+    textDistance  = 30.0,    -- 3D text signs are readable from this far away
+    -- Party music: PROPS tab -> "Place music center here". Loops from that spot,
+    -- full volume up close, then fades out so only people at the party hear it.
+    -- Muted for players on the farewell flight or the highway drive (they have their own music).
+    music = {
+        file     = 'audio/PartySong/BeforeWeSayGoodbye.mp3',
+        volume   = 0.4,      -- 40%
+        fullUpTo = 15.0,     -- metres from the music center at full volume
+        silentAt = 45.0,     -- metres where it has faded to nothing
+    },
+    list = {
+        -- Main props
+        { model = 'prop_table_03',            label = 'Table',                group = 'Main props' },
+        { model = 'prop_chair_04a',           label = 'Chair',                group = 'Main props' },
+        { model = 'prop_speaker_07',          label = 'PA speaker',           group = 'Main props' },
+        { model = 'prop_podium_mic',          label = 'Microphone podium',    group = 'Main props' },
+        { model = 'prop_mp_barrier_02b',      label = 'Crowd barrier',        group = 'Main props' },
+        { model = 'prop_champset',            label = 'Champagne set',        group = 'Main props', drink = 'champagne' },
+        { model = 'prop_bench_01a',           label = 'Park bench',           group = 'Main props' },
+        -- Extras
+        { model = 'prop_dj_deck_01',          label = 'DJ equipment',         group = 'Extras' },
+        { model = 'prop_speaker_05',          label = 'Speaker (extra)',      group = 'Extras' },
+        { model = 'h4_prop_h4_mic_dj_01a',    label = 'Microphone',           group = 'Extras' },
+        { model = 'prop_cs_folding_chair_01', label = 'Folding chair',        group = 'Extras' },
+        { model = 'prop_radio_01',            label = 'Portable radio',       group = 'Extras' },
+        { model = 'prop_chall_lamp_01n',      label = 'Decorative light',     group = 'Extras' },
+        { model = 'prop_bar_stool_01',        label = 'Bar stool',            group = 'Extras' },
+        { model = 'prop_table_06',            label = 'Table (round)',        group = 'Extras' },
+        { model = 'prop_bbq_1',               label = 'BBQ',                  group = 'Extras' },
+        { model = 'prop_beach_fire',          label = 'Bonfire',              group = 'Extras' },
+        { model = 'prop_worklight_03b',       label = 'Work light',           group = 'Extras' },
+        { model = 'prop_patio_lounger1',      label = 'Lounger',              group = 'Extras' },
+        { model = 'prop_beer_box_01',         label = 'Box of beer',          group = 'Extras', drink = 'beer' },
+        { model = 'prop_gazebo_02',           label = 'Gazebo',               group = 'Extras' },
+        -- Rugs
+        { model = 'apa_mp_h_acc_rugwooll_03', label = 'Rug (large) 1',        group = 'Rugs' },
+        { model = 'apa_mp_h_acc_rugwooll_04', label = 'Rug (large) 2',        group = 'Rugs' },
+        { model = 'hei_heist_acc_rugwooll_01', label = 'Rug (large) 3',       group = 'Rugs' },
+        { model = 'hei_heist_acc_rugwooll_02', label = 'Rug (large) 4',       group = 'Rugs' },
+        { model = 'apa_mp_h_acc_rugwoolm_01', label = 'Rug (medium) 1',       group = 'Rugs' },
+        { model = 'apa_mp_h_acc_rugwoolm_03', label = 'Rug (medium) 2',       group = 'Rugs' },
+        { model = 'apa_mp_h_acc_rugwools_01', label = 'Rug (small)',          group = 'Rugs' },
+        { model = 'ch_prop_ch_ped_rug_01a',   label = 'Casino rug',           group = 'Rugs' },
+        { model = 'sum_prop_ac_tigerrug_01a', label = 'Tiger-skin rug',       group = 'Rugs' },
+        { model = 'prop_beach_towel_01',      label = 'Beach towel',          group = 'Rugs' },
+        -- Party
+        { model = 'xm3_prop_xm3_balloon_01a', label = 'Balloon',              group = 'Party' },
+        { model = 'vw_prop_vw_barrier_rope_01a', label = 'Velvet rope post',  group = 'Party' },
+        { model = 'vw_prop_vw_barrier_rope_02a', label = 'Velvet rope (long)', group = 'Party' },
+        { model = 'ba_prop_battle_champ_open', label = 'Champagne (open)',    group = 'Party', drink = 'champagne' },
+        { model = 'apa_p_apa_champ_flute_s',  label = 'Champagne glass',      group = 'Party' },
+        { model = 'prop_cocktail',            label = 'Cocktail',             group = 'Party', drink = 'cocktail' },
+        { model = 'prop_keg_01',              label = 'Beer keg',             group = 'Party', drink = 'beer' },
+        { model = 'prop_bar_pump_01',         label = 'Beer tap',             group = 'Party', drink = 'beer' },
+        { model = 'prop_cs_whiskey_bottle',   label = 'Whisky bottle',        group = 'Party', drink = 'whisky' },
+        { model = 'prop_bar_cooler_01',       label = 'Drinks cooler',        group = 'Party', drink = 'beer' },
+        { model = 'v_res_cakedome',           label = 'Cake',                 group = 'Party' },
+        { model = 'ba_prop_battle_glowstick_01', label = 'Glow stick',        group = 'Party' },
+        { model = 'ba_prop_battle_dj_stand',  label = 'DJ stand',             group = 'Party' },
+        { model = 'ba_prop_battle_dj_kit_speaker', label = 'DJ speaker',      group = 'Party' },
+        { model = 'xs_prop_arena_confetti_cannon', label = 'Confetti cannon', group = 'Party' },
+        { model = 'ind_prop_firework_01',     label = 'Fireworks box 1',      group = 'Party' },
+        { model = 'ind_prop_firework_03',     label = 'Fireworks box 2',      group = 'Party' },
+        { model = 'reh_prop_reh_lantern_pk_01a', label = 'Lantern',           group = 'Party' },
+        { model = 'prop_beach_parasol_01',    label = 'Parasol',              group = 'Party' },
+        { model = 'prop_tri_finish_banner',   label = 'Finish-line banner',   group = 'Party' },
+        { model = 'ba_prop_battle_trophy_no1', label = 'Trophy',              group = 'Party' },
+        { model = 'prop_flag_ls',             label = 'Los Santos flag',      group = 'Party' },
+        { model = 'prop_flag_us',             label = 'US flag',              group = 'Party' },
+        { model = 'prop_air_bench_01',        label = 'Airport bench',        group = 'Party' },
+        -- Signs: floating 3D text you type in the PROPS tab (e.g. "FINAL DEPARTURES ->")
+        { model = '__text',                   label = 'Sign (3D text)',       group = 'Signs' },
+    },
+}

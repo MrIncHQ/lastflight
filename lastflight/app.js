@@ -265,6 +265,40 @@
         volTimer = setTimeout(() => hide('vol'), 1500);
     }
 
+    // Party music: loops from the music center; Lua sends the volume as you walk
+    // closer / away. elapsed keeps everyone at the same point in the song.
+    let party = null;
+    let partyTarget = 0;
+    let partyTimer = null;
+    function partyMusic(d) {
+        const clamp = (v) => Math.max(0, Math.min(1, Number(v) || 0));
+        if (d.stop) {
+            clearInterval(partyTimer);
+            partyTimer = null;
+            if (party) { party.pause(); party.src = ''; party = null; }
+            return;
+        }
+        if (d.volume !== undefined) partyTarget = clamp(d.volume);
+        if (d.file) {
+            if (party) { party.pause(); party.src = ''; }
+            const a = new Audio(d.file);
+            a.loop = true;
+            a.volume = partyTarget;
+            a.addEventListener('loadedmetadata', () => {
+                if (a.duration && isFinite(a.duration)) a.currentTime = Math.max(0, d.elapsed || 0) % a.duration;
+            }, { once: true });
+            a.play().catch(() => { /* retried on the next start */ });
+            party = a;
+            // glide toward the target volume so walking away fades smoothly
+            clearInterval(partyTimer);
+            partyTimer = setInterval(() => {
+                if (!party) return;
+                const v = party.volume;
+                party.volume = Math.abs(partyTarget - v) < 0.01 ? partyTarget : v + (partyTarget - v) * 0.25;
+            }, 50);
+        }
+    }
+
     // Cabin chime (seatbelt sign on): a soft bell made here, no audio file needed
     let chimeCtx = null;
     function playChime({ volume = 0.7 } = {}) {
@@ -397,7 +431,9 @@
         if (!s.show) { hide('setup'); hide('s-cmds'); return; }
         show('setup');
         panel.classList.toggle('collapsed', !s.focused);
+        panel.classList.toggle('placing', !!s.placing);
         renderCommands(s);
+        renderProps(s);
         $('s-key-panel').textContent = s.keys.panel;
         $('s-key-panel2').textContent = s.keys.panel;
 
@@ -512,8 +548,121 @@
             ['clearhistory <id | all>', 'Let a player (or everyone) take the flight again'],
         ]],
     ];
-    let cmdsOpen = false;
+    let sideTab = null;        // null | 'cmds' | 'props' - which side tab is open
     let cmdsBuilt = '';
+
+    function showSideTab() {
+        $('s-cmds-list').classList.toggle('hidden', sideTab !== 'cmds');
+        $('s-cmds-tab').classList.toggle('on', sideTab === 'cmds');
+        $('s-props').classList.toggle('hidden', sideTab !== 'props');
+        $('s-props-tab').classList.toggle('on', sideTab === 'props');
+    }
+
+    // ---------------- Props tab ----------------
+    let propsBuilt = '';
+    function renderProps(s) {
+        const p = s.props;
+        $('s-props-tab').classList.toggle('hidden', !p || !p.enabled);
+        if (!p || !p.enabled) { if (sideTab === 'props') sideTab = null; showSideTab(); return; }
+        // the dropdown is built once, so a re-render never resets what you picked
+        const key = JSON.stringify(p.catalog);
+        if (propsBuilt !== key) {
+            propsBuilt = key;
+            const groups = {};
+            for (const c of p.catalog) (groups[c.group] = groups[c.group] || []).push(c);
+            let html = '<option value="">Choose a prop...</option>';
+            for (const [g, items] of Object.entries(groups)) {
+                html += `<optgroup label="${esc(g)}">`;
+                for (const c of items) {
+                    html += `<option value="${esc(c.model)}" ${c.ok ? '' : 'disabled'}>${esc(c.label)}${c.ok ? '' : ' (not found)'}</option>`;
+                }
+                html += '</optgroup>';
+            }
+            html += '<optgroup label="Other"><option value="__custom">Custom model name...</option></optgroup>';
+            $('p-model').innerHTML = html;
+            propsPicked();
+        }
+        $('p-count').textContent = `${p.placed.length} / ${p.max}`;
+        $('p-list').innerHTML = p.placed.length
+            ? p.placed.slice(0, 150).map((r) => `<div class="p-row">
+                    <span class="p-name" title="${esc(r.label)}">${esc(r.label)}</span><span class="p-dist">${r.dist} m</span>
+                    <button data-p="go" data-id="${r.id}">Go</button>
+                    <button data-p="move" data-id="${r.id}">Move</button>
+                    <button class="p-del" data-p="delete" data-id="${r.id}">Delete</button>
+                </div>`).join('')
+            : '<div class="p-empty">No props placed yet.</div>';
+        $('p-clear').disabled = !p.placed.length;
+        const m = p.music;
+        $('p-music').classList.toggle('hidden', !m);
+        if (m) {
+            $('p-music-state').textContent = m.set
+                ? `Playing from the music center, ${m.dist} m from you (volume ${m.volume}%). It fades out as people walk away.`
+                : 'Not placed. Stand where the music should come from and click the button.';
+            $('p-music-here').textContent = m.set ? 'Move music center here' : 'Place music center here';
+            if (!volDragging) {
+                $('p-music-vol').value = m.volume;
+                $('p-music-vol-val').textContent = `${m.volume}%`;
+            }
+            $('p-music-go').disabled = !m.set;
+            $('p-music-off').disabled = !m.set;
+        }
+        showSideTab();
+    }
+    // volume slider: shows the number while dragging, saves when let go
+    let volDragging = false;
+    $('p-music-vol').addEventListener('input', () => {
+        volDragging = true;
+        $('p-music-vol-val').textContent = `${$('p-music-vol').value}%`;
+    });
+    $('p-music-vol').addEventListener('change', () => {
+        volDragging = false;
+        post('propAction', { action: 'musicVolume', volume: Number($('p-music-vol').value) });
+    });
+    $('p-music-here').onclick = () => post('propAction', { action: 'musicHere' });
+    $('p-music-go').onclick = () => post('propAction', { action: 'musicGo' });
+    $('p-music-off').onclick = () => post('propAction', { action: 'musicOff' });
+
+    function propsPicked() {
+        const v = $('p-model').value;
+        $('p-custom').classList.toggle('hidden', v !== '__custom');
+        $('p-text').classList.toggle('hidden', v !== '__text');
+    }
+    $('p-model').addEventListener('change', propsPicked);
+
+    $('p-place').onclick = () => {
+        let model = $('p-model').value;
+        if (model === '__custom') model = $('p-custom').value.trim();
+        post('propAction', { action: 'place', model, text: $('p-text').value });
+    };
+    $('p-refresh').onclick = () => post('propAction', { action: 'refresh' });
+    $('p-list').addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-p]');
+        if (!b) return;
+        if (b.dataset.p === 'delete' && !b.dataset.armed) {   // NUI has no confirm(): second click deletes
+            b.dataset.armed = '1';
+            b.textContent = 'Sure?';
+            setTimeout(() => { delete b.dataset.armed; b.textContent = 'Delete'; }, 3000);
+            return;
+        }
+        post('propAction', { action: b.dataset.p, id: Number(b.dataset.id) });
+    });
+    $('p-clear').onclick = () => {
+        const b = $('p-clear');
+        if (!b.dataset.armed) {
+            b.dataset.armed = '1';
+            b.textContent = 'Click again to delete every prop';
+            setTimeout(() => { delete b.dataset.armed; b.textContent = 'Delete all props'; }, 3000);
+            return;
+        }
+        delete b.dataset.armed;
+        b.textContent = 'Delete all props';
+        post('propAction', { action: 'clear' });
+    };
+    $('s-props-tab').onclick = () => {
+        sideTab = sideTab === 'props' ? null : 'props';
+        showSideTab();
+        if (sideTab === 'props') post('propAction', { action: 'refresh' });   // fresh distances
+    };
 
     function renderCommands(s) {
         const box = $('s-cmds');
@@ -533,14 +682,12 @@
                 + `${esc(k.point || 'F6')} add a route point (while recording)<br>${esc(k.delete || 'F5')} delete the nearest route point<br>Click a command to copy it.</div>`;
             $('s-cmds-list').innerHTML = html;
         }
-        $('s-cmds-list').classList.toggle('hidden', !cmdsOpen);
-        $('s-cmds-tab').classList.toggle('on', cmdsOpen);
+        showSideTab();
     }
 
     $('s-cmds-tab').onclick = () => {
-        cmdsOpen = !cmdsOpen;
-        $('s-cmds-list').classList.toggle('hidden', !cmdsOpen);
-        $('s-cmds-tab').classList.toggle('on', cmdsOpen);
+        sideTab = sideTab === 'cmds' ? null : 'cmds';
+        showSideTab();
     };
     $('s-cmds-list').addEventListener('click', (e) => {
         const b = e.target.closest('.s-cmd');
@@ -645,6 +792,7 @@
                 break;
             case 'audio': playTrack(data); break;
             case 'chime': playChime(data); break;
+            case 'partyMusic': partyMusic(data); break;
             case 'playlist': playPlaylist(data); break;
             case 'musicVolume': setMusicVolume(data); break;
             case 'buckle': renderBuckle(data); break;
