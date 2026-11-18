@@ -42,5 +42,6 @@ files {
     'audio/lastdrive/*.mp3',
     'audio/flightspeech/*.mp3',
     'audio/PartySong/*.mp3',
+    'livery/*.png',
     'audio/*.ogg',
 }

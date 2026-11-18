@@ -1922,6 +1922,9 @@ Config.Aircraft = {
     model       = 'jet',
     livery      = nil,              -- nil = GTA picks a paint job each spawn. Easier: stand by the jet and use
                                     -- /lastflight livery 0, 1, 2... to try them live; the last one is saved
+    -- Last Flight paint job: replaces the "Air Herler" paint (livery 2) with ours
+    -- while the game runs, so no game files need editing. enabled = false: normal GTA paint.
+    customLivery = { enabled = true, file = 'livery/jet_sign_3.png', texture = 'jet_sign_3', livery = 2 },
     pilotModel  = 's_m_m_pilot_01',
     spawnPilot  = true,
     spawnOnStart = false,           -- false: the jet spawns when the first ticket is sold (no idle entity)

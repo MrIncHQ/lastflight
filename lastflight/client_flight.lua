@@ -486,6 +486,23 @@ table.insert(LFC.onCleanup, function()
     end
 end)
 
+-- Last Flight paint job: swap the jet's Air Herler texture for ours while the
+-- game runs (no edited game files). Every player with the resource sees it.
+CreateThread(function()
+    local cl = Config.Aircraft.customLivery
+    if not (cl and cl.enabled) then return end
+    local txd = CreateRuntimeTxd('lastflight_livery')
+    local tex = CreateRuntimeTextureFromImage(txd, cl.texture, cl.file)
+    if not tex or tex == 0 then
+        return print('^1[lastflight] Custom jet paint: could not load ' .. tostring(cl.file) .. '^7')
+    end
+    -- the jet's textures can come from its normal or its HD texture set: replace in both
+    AddReplaceTexture(Config.Aircraft.model, cl.texture, 'lastflight_livery', cl.texture)
+    AddReplaceTexture(Config.Aircraft.model .. '+hi', cl.texture, 'lastflight_livery', cl.texture)
+    print(('[lastflight] Custom jet paint loaded (%s, %dx%d) - replaces %s/%s'):format(cl.file,
+        GetRuntimeTextureWidth(tex), GetRuntimeTextureHeight(tex), Config.Aircraft.model, cl.texture))
+end)
+
 -- Invincible only stops NEW damage, so knocks taken in the moment after it
 -- spawns (or scraping the runway) would stay - and a damaged jet engine keeps
 -- burning. Repair anything, turn engine / tank fires off, and ignore bumps.
@@ -511,6 +528,9 @@ function LFC.ProtectJet(veh)
         StopEntityFire(veh)
     end
     local want = GlobalState.lf_livery
+    -- no paint job locked by an admin: use the Last Flight one
+    local cl = Config.Aircraft.customLivery
+    if want == nil and cl and cl.enabled then want = cl.livery end
     if want then
         local cur, count, kind = LFC.JetLivery(veh)
         if cur ~= want and want < count then
