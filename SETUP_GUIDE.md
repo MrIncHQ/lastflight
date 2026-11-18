@@ -52,7 +52,9 @@ Any server admin can set it up. Being an admin in the **txAdmin** web panel is n
 4. To move a location, stand where you want it and click **Set here**. For routes, click **Record**, drive the path and press **F6** at each point. Press **F7** to bring the panel back.
 5. Click **Save as default**.
 
-**Jet paint job:** the jet wears the Last Flight paint (sunset tail, LAST FLIGHT on the sides). If it shows another airline, stand by the jet and type `/lastflight livery 2`. To use GTA's own paint jobs instead, set `enabled = false` on the `customLivery` line in `lastflight/config.lua`, then pick one with `/lastflight livery 0`, `1`, `2` or `3`.
+**Jet paint job:** the jet wears the Flight Leonida paint (pink body, sunset tail, FLIGHT LEONIDA on the sides). If it shows another airline, stand by the jet and type `/lastflight livery 2`. To use GTA's own paint jobs instead, set `enabled = false` on the `customLivery` line in `lastflight/config.lua`, then pick one with `/lastflight livery 0`, `1`, `2` or `3`.
+
+**Shuttle bus paint:** both shuttle buses wear the Flight Leonida paint too. To turn it off, set `enabled = false` on the `busLivery` line in `lastflight/config.lua`. To use your own picture for a paint job, put it in `lastflight/livery/custom/` with the same file name as the one in `lastflight/livery/`. It is used instead.
 
 **Highway drive:** the Legion Square driver also offers a farewell drive around the island (target the NPC and pick **Farewell highway drive**). To change its loop, open the **Highway drive** section, click **Clear** on the loop, then **Record** with **Auto** on and drive the highways once. Save when you're back.
 

@@ -43,5 +43,6 @@ files {
     'audio/flightspeech/*.mp3',
     'audio/PartySong/*.mp3',
     'livery/*.png',
+    'livery/custom/*.png',
     'audio/*.ogg',
 }

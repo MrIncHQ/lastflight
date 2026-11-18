@@ -486,21 +486,33 @@ table.insert(LFC.onCleanup, function()
     end
 end)
 
--- Last Flight paint job: swap the jet's Air Herler texture for ours while the
--- game runs (no edited game files). Every player with the resource sees it.
+-- Flight Leonida paint jobs (jet + shuttle bus): swap a vehicle's own paint
+-- texture for ours while the game runs (no edited game files). Every player
+-- with the resource sees it.
 CreateThread(function()
-    local cl = Config.Aircraft.customLivery
-    if not (cl and cl.enabled) then return end
     local txd = CreateRuntimeTxd('lastflight_livery')
-    local tex = CreateRuntimeTextureFromImage(txd, cl.texture, cl.file)
-    if not tex or tex == 0 then
-        return print('^1[lastflight] Custom jet paint: could not load ' .. tostring(cl.file) .. '^7')
+    local jet = Config.Aircraft.customLivery
+    local bus = Config.Transport.busLivery
+    for _, cl in ipairs({
+        jet and jet.enabled and { model = Config.Aircraft.model, texture = jet.texture, file = jet.file, name = 'jet' } or false,
+        bus and bus.enabled and { model = bus.model, texture = bus.texture, file = bus.file, name = 'bus' } or false,
+    }) do
+        if cl then
+            -- a picture with the same name in livery/custom/ (your own, not shared) wins
+            local custom = cl.file:gsub('^livery/', 'livery/custom/')
+            if LoadResourceFile(GetCurrentResourceName(), custom) then cl.file = custom end
+            local tex = CreateRuntimeTextureFromImage(txd, cl.texture, cl.file)
+            if not tex or tex == 0 then
+                print(('^1[lastflight] Custom %s paint: could not load %s^7'):format(cl.name, tostring(cl.file)))
+            else
+                -- a vehicle's textures can come from its normal or its HD texture set: replace in both
+                AddReplaceTexture(cl.model, cl.texture, 'lastflight_livery', cl.texture)
+                AddReplaceTexture(cl.model .. '+hi', cl.texture, 'lastflight_livery', cl.texture)
+                print(('[lastflight] Custom %s paint loaded (%s, %dx%d) - replaces %s/%s'):format(cl.name, cl.file,
+                    GetRuntimeTextureWidth(tex), GetRuntimeTextureHeight(tex), cl.model, cl.texture))
+            end
+        end
     end
-    -- the jet's textures can come from its normal or its HD texture set: replace in both
-    AddReplaceTexture(Config.Aircraft.model, cl.texture, 'lastflight_livery', cl.texture)
-    AddReplaceTexture(Config.Aircraft.model .. '+hi', cl.texture, 'lastflight_livery', cl.texture)
-    print(('[lastflight] Custom jet paint loaded (%s, %dx%d) - replaces %s/%s'):format(cl.file,
-        GetRuntimeTextureWidth(tex), GetRuntimeTextureHeight(tex), Config.Aircraft.model, cl.texture))
 end)
 
 -- Invincible only stops NEW damage, so knocks taken in the moment after it

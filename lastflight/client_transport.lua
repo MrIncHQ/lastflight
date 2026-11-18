@@ -236,6 +236,10 @@ local function spawnRide(r)
     end
     local veh = CreateVehicle(vehHash, x, y, z, h, true, false)
     SetEntityAsMissionEntity(veh, true, true)
+    local bl = Config.Transport.busLivery
+    if bl and bl.enabled and GetEntityModel(veh) == joaat(bl.model) then
+        SetVehicleLivery(veh, bl.livery)          -- the Flight Leonida paint
+    end
     SetVehicleOnGroundProperly(veh)
     SetVehicleEngineOn(veh, true, true, false)
     SetVehicleDoorsLocked(veh, 2)              -- no carjacking the driver; riders are warped in
