@@ -99,11 +99,11 @@ Plan your event around these times:
 
 | Trip | Time |
 |---|---|
-| **The flight**: buy a ticket at the airport desk, gate shuttle, boarding, the flight and the farewell message | about **15 minutes** |
-| **Highway drive**: Legion Square around the island to the airport desk | about **26 minutes** |
-| **Highway drive, then the flight** | about **41 minutes** |
-
-Players who take the airport bus from Legion Square instead of the highway drive add the bus ride on top of the 15 minutes.
+| **Airport bus**: Legion Square to the airport desk | about **5 minutes** |
+| **The flight**: buy a ticket, gate shuttle, boarding, the flight and the farewell message | about **16 minutes** |
+| **Airport bus, then the flight** | about **21 minutes** |
+| **Highway drive**: Legion Square around the island to the airport desk | about **21 minutes** |
+| **Highway drive, then the flight** | about **37 minutes** |
 
 ## If something goes wrong
 

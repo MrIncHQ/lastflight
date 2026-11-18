@@ -31,9 +31,11 @@ Built for **Qbox** with **ox_lib**, **ox_inventory** and **ox_target**.
 
 | Trip | Time |
 |---|---|
-| The flight (ticket, shuttle, boarding, flight) | about 15 minutes |
-| Highway drive (Legion Square to the airport) | about 26 minutes |
-| Highway drive, then the flight | about 41 minutes |
+| Bus from Legion Square to the airport | about 5 minutes |
+| The flight (gate shuttle, boarding, flight) | about 16 minutes |
+| Bus, then the flight | about 21 minutes |
+| Highway drive (Legion Square around the island to the airport) | about 21 minutes |
+| Highway drive, then the flight | about 37 minutes |
 
 ---
 

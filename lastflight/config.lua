@@ -220,7 +220,7 @@ Config.Tour = {
     maxCars     = 8,                -- all highway cars on the road at once (server-wide)
     nextAfter   = 120,              -- a new car / convoy can be issued once the previous one has been driving this many seconds
     carSpacing  = 8.0,              -- metres between convoy cars at the pickup (lined up behind the first)
-    minutes     = 22,               -- shown to players (roughly how long the loop takes)
+    minutes     = 21,               -- shown to players (roughly how long the loop takes)
 
     spawn = vec4(236.90, -857.38, 28.70, 248.7),   -- first car, behind the airport bus bay (Legion Square)
     -- The highway loop, then the drop-off at the airport (last point).
